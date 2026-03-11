@@ -59,11 +59,19 @@
         .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px; border-bottom: 1px solid #f9f9f9; }
         .item-info { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
 
-        /* 카테고리 박스: 폭 고정 (모바일 포함) */
-        .item-category-box {
-            flex: 0 0 90px;
-            max-width: 90px;
-        }
+        /* 기본: 모바일 기준 (좁게) */
+.item-category-box {
+    flex: 0 0 70px;   /* 모바일에서 더 짧게 */
+    max-width: 70px;
+}
+
+/* PC: 화면이 넓을 때 (조금 더 길게) */
+@media (min-width: 900px) {
+    .item-category-box {
+        flex: 0 0 110px;  /* 데스크톱에서 더 넓게 */
+        max-width: 110px;
+    }
+}
 
         .category-select-mini {
             border: none;
@@ -568,4 +576,5 @@
 </script>
 </body>
 </html>
+
 
