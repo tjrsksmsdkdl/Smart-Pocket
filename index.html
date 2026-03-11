@@ -58,8 +58,23 @@
 
         .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px; border-bottom: 1px solid #f9f9f9; }
         .item-info { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
-        .item-category-box { min-width: 80px; }
-        .category-select-mini { border: none; background: #f0f4f8; font-size: 0.75rem; padding: 3px 6px; border-radius: 5px; color: #777; width: 100%; cursor: pointer; }
+        ..item-category-box {
+    flex: 0 0 90px;    /* 고정 폭 */
+    max-width: 90px;
+}
+.category-select-mini {
+    border: none;
+    background: #f0f4f8;
+    font-size: 0.75rem;
+    padding: 3px 6px;
+    border-radius: 5px;
+    color: #777;
+    width: 100%;
+    cursor: pointer;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
         .item-name { font-size: 1rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .item-right { display: flex; align-items: center; gap: 12px; }
         .item-amount { font-size: 1.1rem; font-weight: 500; color: #333; }
@@ -549,3 +564,4 @@
 </script>
 </body>
 </html>
+
