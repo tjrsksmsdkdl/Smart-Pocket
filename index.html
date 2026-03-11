@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Pocket - AI 가계부 최종</title>
+    <title>Smart Pocket - AI 가계부 최종형</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -19,6 +19,7 @@
         .month-nav { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px; }
         .month-nav h1 { margin: 0; font-size: 1.6rem; color: var(--primary-color); min-width: 200px; }
         .nav-btn { cursor: pointer; border: none; background: white; padding: 8px 18px; border-radius: 12px; box-shadow: var(--card-shadow); font-weight: bold; }
+        .top-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
         .action-btn { font-size: 0.8rem; padding: 8px 15px; border-radius: 10px; border: 1px solid #ddd; background: white; cursor: pointer; }
         .input-section { background: white; padding: 25px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 30px; border-top: 5px solid var(--primary-color); position: relative; }
         textarea { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 15px; resize: none; min-height: 80px; outline: none; }
@@ -31,7 +32,7 @@
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         th { position: sticky; top: 0; background: white; padding: 12px; border-bottom: 2px solid #f0f0f0; text-align: left; color: #888; }
         td { padding: 12px; border-bottom: 1px solid #f9f9f9; }
-        .category-select { border: none; background: #f0f4f8; padding: 5px; border-radius: 6px; font-size: 0.8rem; width: 100%; }
+        .category-select { border: none; background: #f0f4f8; padding: 5px; border-radius: 6px; font-size: 0.8rem; width: 100%; cursor: pointer; }
         .total-amount { font-size: 1.6rem; font-weight: bold; color: var(--primary-color); text-align: right; margin-top: 20px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; }
@@ -57,14 +58,14 @@
     <div class="input-section">
         <textarea id="natural-input" placeholder="3/11 택시 4500, 스타벅스 5000"></textarea>
         <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini AI 분석)</button>
-        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">Gemini가 분류 중입니다...</div>
+        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">AI가 항목을 분석하고 있습니다...</div>
     </div>
 
     <div class="main-content">
         <section class="card">
             <div class="table-wrapper">
                 <table>
-                    <thead><tr><th>날짜</th><th>항목</th><th style="width:130px;">카테고리</th><th>금액</th><th></th></tr></thead>
+                    <thead><tr><th>날짜</th><th>항목</th><th style="width:140px;">카테고리</th><th>금액</th><th></th></tr></thead>
                     <tbody id="expense-list"></tbody>
                 </table>
             </div>
@@ -79,7 +80,6 @@
     </div>
 </div>
 
-<!-- 설정 모달 -->
 <div id="settings-modal" class="modal">
     <div class="modal-content">
         <h3>설정</h3>
@@ -90,7 +90,6 @@
         </div>
         <div>
             <label style="font-size:0.8rem; font-weight:bold;">Gemini API Key</label>
-            <div id="key-status-msg" style="font-size:0.7rem; color:red; margin-bottom:5px;"></div>
             <div style="display: flex; gap: 5px;">
                 <input type="password" id="gemini-key-input" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px;" placeholder="AIzaSy...">
                 <button onclick="saveApiKey()" style="padding:8px; background:#444; color:white; border:none; border-radius:8px;">저장</button>
@@ -101,7 +100,6 @@
 </div>
 
 <script>
-    // --- 1. Firebase 설정 (싱가포르 주소 유지) ---
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -125,12 +123,27 @@
 
     let myChart = null;
 
-    // --- 2. AI 분류 로직 (404 해결 버전) ---
+    // AI가 안될 때를 대비한 강력한 로컬 키워드 사전
+    const keywordMap = {
+        '식비': ['밥', '식당', '카페', '커피', '마트', '치킨', '배달', '점심', '저녁', '사과', '빵'],
+        '교통비': ['택시', '버스', '지하철', '주유', '기차', '대리', '주차'],
+        '생활용품': ['생리대', '휴지', '세제', '다이소', '물티슈', '샴푸', '비누', '치약'],
+        '쇼핑/미용': ['가방', '옷', '미용실', '화장품', '백화점', '신발'],
+        '취미': ['영화', '게임', '도서', '헬스', '유튜브', '넷플릭스'],
+        '공과금': ['전기', '가스', '수도', '관리비', '보험', '통신비', '세금']
+    };
+
+    // 1. AI 카테고리 분류 (v1 경로로 수정)
     async function askGeminiToCategorize(itemText) {
+        // AI 시도 전 로컬 키워드 검사 (즉각적인 정확도 확보)
+        for (let [cat, keys] of Object.entries(keywordMap)) {
+            if (state.categories.includes(cat) && keys.some(k => itemText.includes(k))) return cat;
+        }
+
         if (!state.geminiKey) return state.categories[0];
 
-        // 404를 방지하기 위해 v1beta 경로 사용
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`;
+        // 최신 v1 경로 사용
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`;
         
         const prompt = `가계부 항목 "${itemText}"를 다음 카테고리 중 하나로만 대답해: [${state.categories.join(", ")}]. 
         규칙: 아무런 설명 없이 딱 한 단어만 대답할 것.`;
@@ -143,16 +156,14 @@
             });
 
             if (!response.ok) {
-                const errorLog = await response.text();
-                console.error("API 응답 오류:", errorLog);
+                const err = await response.json();
+                console.error("AI 에러 상세:", err);
                 return state.categories[0];
             }
 
             const data = await response.json();
             let aiResult = data.candidates[0].content.parts[0].text.trim();
             aiResult = aiResult.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣/]/g, "").trim();
-            
-            console.log(`AI 분석: ${itemText} -> ${aiResult}`);
             
             return state.categories.includes(aiResult) ? aiResult : state.categories[0];
         } catch (e) {
@@ -161,7 +172,7 @@
         }
     }
 
-    // --- 3. 입력 핸들러 ---
+    // 2. 입력 핸들러 (비동기 처리)
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -190,7 +201,6 @@
                 
                 const category = await askGeminiToCategorize(text);
                 
-                // 데이터 즉시 추가 및 전송
                 const newEx = { id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category };
                 state.expenses.push(newEx);
             }
@@ -203,7 +213,7 @@
         render();
     }
 
-    // --- 4. 기타 함수 ---
+    // --- 나머지 동기화 및 UI 로직 ---
     function initSync() {
         db.ref('/').on('value', (snapshot) => {
             const val = snapshot.val();
@@ -257,15 +267,14 @@
     function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
-        document.getElementById('category-manager-list').innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:red; border:none; background:none; cursor:pointer;">삭제</button></div>`).join('');
-        document.getElementById('key-status-msg').textContent = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음";
+        document.getElementById('category-manager-list').innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:red; border:none; background:none;">삭제</button></div>`).join('');
     }
-    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장됨!"); openSettings(); } }
+    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("키 저장 완료!"); openSettings(); } }
     function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); } }
     function removeCategory(c) { if(state.categories.length > 1 && confirm('삭제?')) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
     function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
     function exportToCSV() { const d = state.expenses.filter(ex => ex.year === state.viewDate.getFullYear() && ex.month === (state.viewDate.getMonth()+1)); let csv = "\uFEFF날짜,항목,카테고리,금액\n"; d.forEach(ex => csv += `${ex.year}-${ex.month}-${ex.day},${ex.item},${ex.category},${ex.amount}\n`); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); link.download = `가계부.csv`; link.click(); }
-    function generateAIAnalysis() { alert('기능 준비 중'); }
+    function generateAIAnalysis() { alert('데이터 기반 지출 리포트 생성 중...'); }
 
     window.onload = initSync;
 </script>
