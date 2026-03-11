@@ -56,8 +56,8 @@
 
     <div class="input-section">
         <textarea id="natural-input" placeholder="예: 3/11 택시 4500, 스타벅스 5000"></textarea>
-        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (AI 분석)</button>
-        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">AI가 카테고리를 분류하고 있습니다...</div>
+        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini AI 분석)</button>
+        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">AI가 항목을 분석하고 있습니다...</div>
     </div>
 
     <div class="main-content">
@@ -100,7 +100,7 @@
 </div>
 
 <script>
-    // 1. Firebase 설정 (싱가포르 주소 유지)
+    // 1. Firebase 설정
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -124,53 +124,46 @@
 
     let myChart = null;
 
-    // --- 2. AI 분류 로직 (최신 v1beta 주소 적용) ---
+    // --- 2. AI 분류 로직 (무적 모델 순회 버전) ---
     async function askGeminiToCategorize(itemText) {
-        if (!state.geminiKey) {
-            console.warn("API 키가 없습니다.");
-            return state.categories[0];
-        }
+        if (!state.geminiKey) return state.categories[0];
 
-        // 404를 방지하는 최신 표준 주소
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`;
-        
-        const payload = {
-            contents: [{
-                parts: [{
-                    text: `이 항목을 카테고리 하나로만 분류해줘: "${itemText}". 
-사용 가능 목록: [${state.categories.join(", ")}]. 
-규칙: 설명 생략, 오직 한 단어로 카테고리명만 답변할 것.`
-                }]
-            }]
-        };
+        // 시도해볼 모델 목록
+        const modelVariants = [
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-pro"
+        ];
 
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorInfo = await response.json();
-                console.error("AI 서버 에러:", errorInfo);
-                return state.categories[0];
-            }
-
-            const data = await response.json();
-            const aiText = data.candidates[0].content.parts[0].text.trim();
-            const cleanedText = aiText.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣]/g, ""); // 특수문자 제거
+        for (const modelName of modelVariants) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${state.geminiKey}`;
             
-            console.log(`AI 분석 성공: ${itemText} -> ${cleanedText}`);
-            return state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `이 지출 항목을 분류해줘: "${itemText}". 목록: [${state.categories.join(", ")}]. 단어 하나만 답해.` }] }]
+                    })
+                });
 
-        } catch (e) {
-            console.error("AI 통신 실패:", e);
-            return state.categories[0];
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.candidates && data.candidates[0].content) {
+                        const aiText = data.candidates[0].content.parts[0].text.trim().replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣]/g, "");
+                        console.log(`성공 (${modelName}): ${itemText} -> ${aiText}`);
+                        return state.categories.includes(aiText) ? aiText : state.categories[0];
+                    }
+                }
+                console.warn(`${modelName} 시도 실패(404 등), 다음 모델로 넘어갑니다.`);
+            } catch (e) {
+                console.error(`${modelName} 통신 오류:`, e);
+            }
         }
+        return state.categories[0]; // 모든 시도 실패 시
     }
 
-    // --- 3. 데이터 입력 핸들러 ---
+    // --- 3. 입력 처리 ---
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -210,7 +203,7 @@
         render();
     }
 
-    // --- 4. Firebase 및 UI ---
+    // --- 4. 데이터베이스 및 UI ---
     function initSync() {
         db.ref('/').on('value', (snapshot) => {
             const val = snapshot.val();
@@ -269,7 +262,6 @@
         }
     }
 
-    // --- 5. 설정 및 기타 ---
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
         const list = document.getElementById('category-manager-list');
