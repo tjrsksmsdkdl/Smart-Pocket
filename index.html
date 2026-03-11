@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Pocket - AI 가계부 최종형</title>
+    <title>Smart Pocket - AI 가계부 (Gemini 3)</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -50,14 +50,13 @@
         <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
             <button class="action-btn" onclick="openSettings()">⚙️ 설정</button>
             <button class="action-btn" onclick="exportToCSV()">📤 CSV 내보내기</button>
-            <button class="action-btn" style="background: var(--primary-color); color: white;" onclick="generateAIAnalysis()">✨ AI 분석 리포트</button>
         </div>
     </header>
 
     <div class="input-section">
         <textarea id="natural-input" placeholder="예: 3/11 택시 4500, 스타벅스 5000"></textarea>
-        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (AI 분석)</button>
-        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">AI가 항목을 분석하고 있습니다...</div>
+        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini 3 분석)</button>
+        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">Gemini 3가 분석 중입니다...</div>
     </div>
 
     <div class="main-content">
@@ -100,7 +99,7 @@
 </div>
 
 <script>
-    // Firebase 설정
+    // 1. Firebase 설정
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -124,48 +123,46 @@
 
     let myChart = null;
 
-    // --- AI 분류 로직 (최신 2.0 및 실험용 모델 최우선 순회) ---
+    // --- 2. AI 분류 로직 (Gemini 3 Flash Preview 전용) ---
     async function askGeminiToCategorize(itemText) {
         if (!state.geminiKey) return state.categories[0];
 
-        // 여러분의 계정에서 활성화된 2.5(실제 주소는 2.0-flash 혹은 exp) 모델을 찾습니다.
-        const modelVariants = [
-            "gemini-2.0-flash",         
-            "gemini-2.0-flash-exp",     
-            "gemini-1.5-flash",
-            "gemini-pro"
-        ];
+        // 확인된 정답 모델명 적용
+        const modelName = "gemini-3-flash-preview"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${state.geminiKey}`;
+        
+        try {
+            // 429 에러 방지를 위한 짧은 대기
+            await new Promise(r => setTimeout(r, 500));
 
-        for (const modelName of modelVariants) {
-            // v1beta 경로가 가장 최신 모델 응답에 최적화되어 있습니다.
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${state.geminiKey}`;
-            
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: `이 지출 항목을 분류해줘: "${itemText}". 목록: [${state.categories.join(", ")}]. 단어 하나만 답해.` }] }]
-                    })
-                });
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `"${itemText}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 설명 없이 단어만 답해.` }] }]
+                })
+            });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.candidates && data.candidates[0].content) {
-                        const aiText = data.candidates[0].content.parts[0].text.trim().replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣/]/g, "");
-                        console.log(`AI 분석 성공! 모델: ${modelName}, 결과: ${aiText}`);
-                        return state.categories.includes(aiText) ? aiText : state.categories[0];
-                    }
-                }
-                console.warn(`${modelName} 모델 시도 결과 404 혹은 에러. 다음 모델로...`);
-            } catch (e) {
-                console.error(`${modelName} 통신 오류:`, e);
+            if (!response.ok) {
+                const err = await response.json();
+                console.error("AI 서버 응답 에러:", err);
+                return state.categories[0];
             }
+
+            const data = await response.json();
+            const aiText = data.candidates[0].content.parts[0].text.trim();
+            const cleanedText = aiText.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣]/g, ""); 
+            
+            console.log(`Gemini 3 분석: ${itemText} -> ${cleanedText}`);
+            return state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
+
+        } catch (e) {
+            console.error("AI 통신 실패:", e);
+            return state.categories[0];
         }
-        return state.categories[0]; 
     }
 
-    // --- 나머지 입력 및 동기화 로직 ---
+    // --- 3. 데이터 입력 처리 ---
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -190,7 +187,7 @@
                 const last = amtMatch[amtMatch.length - 1];
                 let amt = parseFloat(last.replace(/[^\d.]/g, ""));
                 if (last.includes("만원")) amt *= 10000;
-                text = text.replace(last, "").trim() || "기타 지출";
+                text = text.replace(last, "").trim() || "기타";
                 
                 const category = await askGeminiToCategorize(text);
                 const newEx = { id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category };
@@ -205,6 +202,7 @@
         render();
     }
 
+    // --- 4. Firebase 동기화 및 렌더링 ---
     function initSync() {
         db.ref('/').on('value', (snapshot) => {
             const val = snapshot.val();
@@ -230,7 +228,17 @@
         listEl.innerHTML = '';
         data.sort((a,b) => b.day - a.day).forEach(ex => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${ex.month}/${ex.day}</td><td>${ex.item}</td><td><select class="category-select" onchange="updateExCat(${ex.id}, this.value)">${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td>${ex.amount.toLocaleString()}원</td><td><button onclick="deleteEx(${ex.id})" style="border:none; background:none; color:#ccc; cursor:pointer;">✕</button></td>`;
+            tr.innerHTML = `
+                <td>${ex.month}/${ex.day}</td>
+                <td>${ex.item}</td>
+                <td>
+                    <select class="category-select" onchange="updateExCat(${ex.id}, this.value)">
+                        ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </td>
+                <td>${ex.amount.toLocaleString()}원</td>
+                <td><button onclick="deleteEx(${ex.id})" style="border:none; background:none; color:#ccc; cursor:pointer;">✕</button></td>
+            `;
             listEl.appendChild(tr);
         });
         updateStats(data);
@@ -253,11 +261,17 @@
         }
     }
 
+    // --- 5. 설정 및 기타 ---
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
         const list = document.getElementById('category-manager-list');
-        list.innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none; cursor:pointer;">삭제</button></div>`).join('');
-        document.getElementById('key-status-msg').innerHTML = state.geminiKey ? "✅ 키가 저장되어 있습니다." : "❌ 키를 입력해주세요.";
+        list.innerHTML = state.categories.map(c => `
+            <div style="display:flex; justify-content:space-between; padding:5px 0;">
+                <span>${c}</span>
+                <button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none; cursor:pointer;">삭제</button>
+            </div>
+        `).join('');
+        document.getElementById('key-status-msg').innerHTML = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음";
     }
 
     function saveApiKey() {
@@ -265,7 +279,7 @@
         if(k) {
             state.geminiKey = k;
             localStorage.setItem('sp_gemini_key', k);
-            alert("키 저장 성공!");
+            alert("Gemini 3 키 저장 완료!");
             openSettings();
         }
     }
@@ -296,6 +310,7 @@
         link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
         link.download = `가계부_데이터.csv`; link.click();
     }
+
     window.onload = initSync;
 </script>
 </body>
