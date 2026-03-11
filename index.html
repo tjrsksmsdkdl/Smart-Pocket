@@ -105,7 +105,7 @@
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
         projectId: "smart-pocket-ea308",
-        storageBucket: "smart-pocket-ea308.firebasestorage.app",
+        storageBucket: "smart-pocket-ea308.firebasedatabase.app",
         messagingSenderId: "165999635532",
         appId: "1:165999635532:web:d73543e1044437630758e9",
         measurementId: "G-E75HCJPHW3",
@@ -124,12 +124,15 @@
 
     let myChart = null;
 
-    // --- 2. AI 분류 로직 (URL 형식 전면 수정) ---
+    // --- 2. AI 분류 로직 (최신 v1beta 주소 적용) ---
     async function askGeminiToCategorize(itemText) {
-        if (!state.geminiKey) return state.categories[0];
+        if (!state.geminiKey) {
+            console.warn("API 키가 없습니다.");
+            return state.categories[0];
+        }
 
-        // 가장 안정적인 v1 API 엔드포인트
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`;
+        // 404를 방지하는 최신 표준 주소
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`;
         
         const payload = {
             contents: [{
@@ -150,16 +153,15 @@
 
             if (!response.ok) {
                 const errorInfo = await response.json();
-                console.error("AI 서버 에러 상세:", errorInfo);
+                console.error("AI 서버 에러:", errorInfo);
                 return state.categories[0];
             }
 
             const data = await response.json();
             const aiText = data.candidates[0].content.parts[0].text.trim();
-            // 특수문자 제거 후 카테고리 매칭
-            const cleanedText = aiText.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣]/g, "");
+            const cleanedText = aiText.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣]/g, ""); // 특수문자 제거
             
-            console.log(`분석 결과: ${itemText} -> ${cleanedText}`);
+            console.log(`AI 분석 성공: ${itemText} -> ${cleanedText}`);
             return state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
 
         } catch (e) {
@@ -168,7 +170,7 @@
         }
     }
 
-    // --- 3. 데이터 추가 핸들러 ---
+    // --- 3. 데이터 입력 핸들러 ---
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -193,9 +195,8 @@
                 const last = amtMatch[amtMatch.length - 1];
                 let amt = parseFloat(last.replace(/[^\d.]/g, ""));
                 if (last.includes("만원")) amt *= 10000;
-                text = text.replace(last, "").trim() || "기타";
+                text = text.replace(last, "").trim() || "기타 지출";
                 
-                // AI에게 카테고리 물어보기
                 const category = await askGeminiToCategorize(text);
                 const newEx = { id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category };
                 state.expenses.push(newEx);
@@ -209,7 +210,7 @@
         render();
     }
 
-    // --- 4. 데이터베이스 및 UI ---
+    // --- 4. Firebase 및 UI ---
     function initSync() {
         db.ref('/').on('value', (snapshot) => {
             const val = snapshot.val();
@@ -268,6 +269,7 @@
         }
     }
 
+    // --- 5. 설정 및 기타 ---
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
         const list = document.getElementById('category-manager-list');
@@ -285,7 +287,7 @@
         if(k) {
             state.geminiKey = k;
             localStorage.setItem('sp_gemini_key', k);
-            alert("저장 성공! 이제 AI 분석이 가능합니다.");
+            alert("키 저장 성공!");
             openSettings();
         }
     }
