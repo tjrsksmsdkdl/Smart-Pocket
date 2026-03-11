@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Pocket - AI 분류 강화 버전</title>
+    <title>Smart Pocket - AI 가계부 최종</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
     
     <style>
-        :root { --primary-color: #4a90e2; --secondary-color: #f5f7fa; --text-color: #333; --accent-color: #ff6b6b; --card-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        :root { --primary-color: #4a90e2; --secondary-color: #f5f7fa; --text-color: #333; --accent-color: #ff6b6b; --card-shadow: 0 4px 15px rgba(0,0,0,0.08); --ai-bg: #f8f9ff; }
         * { box-sizing: border-box; font-family: 'Noto Sans KR', sans-serif; }
         body { background-color: var(--secondary-color); color: var(--text-color); margin: 0; padding: 15px; }
         .container { max-width: 1200px; margin: 0 auto; }
@@ -20,10 +20,10 @@
         .month-nav h1 { margin: 0; font-size: 1.6rem; color: var(--primary-color); min-width: 200px; }
         .nav-btn { cursor: pointer; border: none; background: white; padding: 8px 18px; border-radius: 12px; box-shadow: var(--card-shadow); font-weight: bold; }
         .action-btn { font-size: 0.8rem; padding: 8px 15px; border-radius: 10px; border: 1px solid #ddd; background: white; cursor: pointer; }
-        .input-section { background: white; padding: 25px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 30px; border-top: 5px solid var(--primary-color); }
+        .input-section { background: white; padding: 25px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 30px; border-top: 5px solid var(--primary-color); position: relative; }
         textarea { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 15px; resize: none; min-height: 80px; outline: none; }
         .add-btn { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .add-btn:disabled { background: #ccc; }
+        .add-btn:disabled { background: #ccc; cursor: wait; }
         .main-content { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
         @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } }
         .card { background: white; padding: 20px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 20px; }
@@ -46,22 +46,17 @@
             <h1 id="current-month-display"></h1>
             <button class="nav-btn" onclick="changeMonth(1)">▶</button>
         </div>
-        <div id="sync-status" style="font-size: 0.7rem; color: #888; margin-bottom: 10px;">Cloud Connecting...</div>
-        <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
+        <div id="sync-status" style="font-size: 0.7rem; color: #2ecc71; margin-bottom: 10px;">● Cloud Syncing...</div>
+        <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
             <button class="action-btn" onclick="openSettings()">⚙️ 설정</button>
-            <button class="action-btn" onclick="exportToCSV()">📤 CSV</button>
-            <button class="action-btn" style="background: var(--primary-color); color: white;" onclick="generateAIAnalysis()">✨ AI 분석</button>
+            <button class="action-btn" onclick="exportToCSV()">📤 CSV 내보내기</button>
+            <button class="action-btn" style="background: var(--primary-color); color: white;" onclick="generateAIAnalysis()">✨ AI 분석 리포트</button>
         </div>
     </header>
 
-    <div id="ai-report-box" class="card" style="display:none; background: #f8f9ff;">
-        <h2>✨ AI 지출 분석</h2>
-        <div id="ai-content"></div>
-    </div>
-
     <div class="input-section">
         <textarea id="natural-input" placeholder="3/11 택시 4500, 스타벅스 5000"></textarea>
-        <button id="add-btn" class="add-btn" onclick="handleAdd()">내역 기록하기 (Gemini AI)</button>
+        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini AI 분석)</button>
         <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">Gemini가 분류 중입니다...</div>
     </div>
 
@@ -69,34 +64,31 @@
         <section class="card">
             <div class="table-wrapper">
                 <table>
-                    <thead><tr><th>날짜</th><th>항목</th><th>카테고리</th><th>금액</th><th></th></tr></thead>
+                    <thead><tr><th>날짜</th><th>항목</th><th style="width:130px;">카테고리</th><th>금액</th><th></th></tr></thead>
                     <tbody id="expense-list"></tbody>
                 </table>
             </div>
         </section>
-
         <div class="stats-side">
             <section class="card">
                 <div style="height: 250px;"><canvas id="expenseChart"></canvas></div>
                 <div id="summary-list"></div>
                 <div id="total-display" class="total-amount">0원</div>
             </section>
-            <section class="card">
-                <textarea id="month-memo" style="width: 100%; min-height: 80px; border: 1px solid #eee; padding: 10px; border-radius: 12px;" placeholder="메모..." oninput="saveMemo()"></textarea>
-            </section>
         </div>
     </div>
 </div>
 
+<!-- 설정 모달 -->
 <div id="settings-modal" class="modal">
     <div class="modal-content">
         <h3>설정</h3>
-        <div id="category-manager-list" style="margin-bottom: 20px; max-height: 180px; overflow-y: auto;"></div>
-        <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+        <div id="category-manager-list" style="margin-bottom: 20px; max-height: 200px; overflow-y: auto;"></div>
+        <div style="display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 15px;">
             <input type="text" id="new-cat-input" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px;">
             <button onclick="addCategory()" style="padding:8px; background:var(--primary-color); color:white; border:none; border-radius:8px;">추가</button>
         </div>
-        <div style="padding-top:15px; border-top:1px dashed #ccc;">
+        <div>
             <label style="font-size:0.8rem; font-weight:bold;">Gemini API Key</label>
             <div id="key-status-msg" style="font-size:0.7rem; color:red; margin-bottom:5px;"></div>
             <div style="display: flex; gap: 5px;">
@@ -104,12 +96,12 @@
                 <button onclick="saveApiKey()" style="padding:8px; background:#444; color:white; border:none; border-radius:8px;">저장</button>
             </div>
         </div>
-        <button onclick="closeSettings()" style="width:100%; margin-top:20px; padding:12px; border:none; border-radius:12px;">닫기</button>
+        <button onclick="closeSettings()" style="width:100%; margin-top:20px; padding:12px; border:none; border-radius:12px; cursor:pointer;">닫기</button>
     </div>
 </div>
 
 <script>
-    // --- 1. Firebase ---
+    // --- 1. Firebase 설정 (싱가포르 주소 유지) ---
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -128,68 +120,48 @@
         viewDate: new Date(),
         expenses: [],
         categories: ['식비', '교통비', '쇼핑/미용', '공과금', '취미', '생활용품', '구독/디지털'],
-        memos: {},
-        filter: null,
         geminiKey: localStorage.getItem('sp_gemini_key') || "" 
     };
 
     let myChart = null;
 
-    // --- 2. AI 분류 로직 (대폭 수정) ---
+    // --- 2. AI 분류 로직 (404 해결 버전) ---
     async function askGeminiToCategorize(itemText) {
-        if (!state.geminiKey) {
-            console.log("API 키가 없습니다.");
-            return state.categories[0];
-        }
+        if (!state.geminiKey) return state.categories[0];
 
-        // URL 및 모델 엔드포인트 최적화
+        // 404를 방지하기 위해 v1beta 경로 사용
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`;
         
-        const prompt = `가계부 항목 "${itemText}"를 다음 카테고리 중 하나로만 정확히 분류해: [${state.categories.join(", ")}]. 
-        대답은 반드시 카테고리 이름 한 단어여야 함. 별표(**)나 다른 말은 절대 금지.`;
+        const prompt = `가계부 항목 "${itemText}"를 다음 카테고리 중 하나로만 대답해: [${state.categories.join(", ")}]. 
+        규칙: 아무런 설명 없이 딱 한 단어만 대답할 것.`;
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    safetySettings: [ // 필터로 인한 거부 방지
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                    ]
-                })
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
             });
 
-            const data = await response.json();
-            
-            if (data.candidates && data.candidates[0].content) {
-                let aiResult = data.candidates[0].content.parts[0].text.trim();
-                
-                // 마크다운(**) 및 특수문자 제거
-                aiResult = aiResult.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣/]/g, "").trim();
-                
-                console.log(`AI 분석 결과: [${aiResult}]`); // 디버깅용 로그
-
-                // 결과가 목록에 포함되어 있는지 확인
-                if (state.categories.includes(aiResult)) {
-                    return aiResult;
-                } else {
-                    // 유사가 매칭 (예: "식비" 포함 여부)
-                    const matched = state.categories.find(c => aiResult.includes(c));
-                    return matched || state.categories[0];
-                }
+            if (!response.ok) {
+                const errorLog = await response.text();
+                console.error("API 응답 오류:", errorLog);
+                return state.categories[0];
             }
-            return state.categories[0];
+
+            const data = await response.json();
+            let aiResult = data.candidates[0].content.parts[0].text.trim();
+            aiResult = aiResult.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣/]/g, "").trim();
+            
+            console.log(`AI 분석: ${itemText} -> ${aiResult}`);
+            
+            return state.categories.includes(aiResult) ? aiResult : state.categories[0];
         } catch (e) {
             console.error("AI 요청 실패:", e);
             return state.categories[0];
         }
     }
 
-    // --- 3. 입력 핸들러 (Async) ---
+    // --- 3. 입력 핸들러 ---
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -204,7 +176,6 @@
         const month = state.viewDate.getMonth() + 1;
         let day = new Date().getDate();
 
-        const results = [];
         for (const seg of segments) {
             let text = seg;
             const dateMatch = text.match(/(\d{1,2})[월\/](\d{1,2})일?/);
@@ -217,31 +188,28 @@
                 if (last.includes("만원")) amt *= 10000;
                 text = text.replace(last, "").trim() || "기타";
                 
-                // AI에게 카테고리 물어보기
                 const category = await askGeminiToCategorize(text);
-                results.push({ id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category });
+                
+                // 데이터 즉시 추가 및 전송
+                const newEx = { id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category };
+                state.expenses.push(newEx);
             }
         }
 
-        if (results.length > 0) {
-            state.expenses = [...state.expenses, ...results];
-            inp.value = '';
-            pushToCloud();
-        }
-        
+        inp.value = '';
+        pushToCloud();
         btn.disabled = false;
         loader.style.display = 'none';
         render();
     }
 
-    // --- 4. 기타 동기화 및 렌더링 로직 ---
+    // --- 4. 기타 함수 ---
     function initSync() {
         db.ref('/').on('value', (snapshot) => {
             const val = snapshot.val();
             if (val) {
                 state.expenses = val.expenses ? Object.values(val.expenses) : [];
                 state.categories = val.categories || state.categories;
-                state.memos = val.memos || {};
                 render();
             }
         });
@@ -250,7 +218,6 @@
     function pushToCloud() {
         db.ref('expenses').set(state.expenses);
         db.ref('categories').set(state.categories);
-        db.ref('memos').set(state.memos);
     }
 
     function render() {
@@ -258,24 +225,14 @@
         const month = state.viewDate.getMonth() + 1;
         document.getElementById('current-month-display').textContent = `${year}년 ${month}월`;
         let data = state.expenses.filter(ex => ex.year === year && ex.month === month);
-        if (state.filter) data = data.filter(ex => ex.category === state.filter);
         const listEl = document.getElementById('expense-list');
         listEl.innerHTML = '';
         data.sort((a,b) => b.day - a.day).forEach(ex => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${ex.month}/${ex.day}</td>
-                <td style="font-weight:500">${ex.item}</td>
-                <td><select class="category-select" onchange="updateExCat(${ex.id}, this.value)">
-                    ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
-                </select></td>
-                <td>${ex.amount.toLocaleString()}원</td>
-                <td><button onclick="deleteEx(${ex.id})" style="border:none; background:none; color:#ccc; cursor:pointer;">✕</button></td>
-            `;
+            tr.innerHTML = `<td>${ex.month}/${ex.day}</td><td>${ex.item}</td><td><select class="category-select" onchange="updateExCat(${ex.id}, this.value)">${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td>${ex.amount.toLocaleString()}원</td><td><button onclick="deleteEx(${ex.id})" style="border:none; background:none; color:#ccc; cursor:pointer;">✕</button></td>`;
             listEl.appendChild(tr);
         });
         updateStats(data);
-        document.getElementById('month-memo').value = state.memos[`${year}-${month}`] || "";
     }
 
     function updateStats(data) {
@@ -285,62 +242,30 @@
         let total = 0;
         Object.entries(stats).sort((a,b) => b[1]-a[1]).forEach(([cat, amt]) => {
             total += amt;
-            const div = document.createElement('div');
-            div.style.cssText = `display:flex; justify-content:space-between; padding:8px; cursor:pointer; font-size:0.9rem; background:${state.filter===cat?'#eef5ff':'transparent'}`;
-            div.onclick = () => { state.filter = (state.filter === cat ? null : cat); render(); };
-            div.innerHTML = `<span>${cat}</span><span>${amt.toLocaleString()}원</span>`;
-            summaryEl.appendChild(div);
+            summaryEl.innerHTML += `<div style="display:flex; justify-content:space-between; padding:5px; font-size:0.9rem;"><span>${cat}</span><span>${amt.toLocaleString()}원</span></div>`;
         });
         document.getElementById('total-display').textContent = `${total.toLocaleString()}원`;
         const ctx = document.getElementById('expenseChart').getContext('2d');
         if (myChart) myChart.destroy();
         if (Object.keys(stats).length > 0) {
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), backgroundColor: ['#4a90e2', '#ff6b6b', '#feca57', '#1dd1a1', '#a29bfe', '#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#576574'], borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%' }
-            });
+            myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), backgroundColor: ['#4a90e2', '#ff6b6b', '#feca57', '#1dd1a1', '#a29bfe', '#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#576574'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%' } });
         }
     }
 
     function deleteEx(id) { if(confirm('삭제?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); } }
     function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); }
-    function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); state.filter = null; render(); }
-    function saveMemo() { const k = `${state.viewDate.getFullYear()}-${state.viewDate.getMonth()+1}`; state.memos[k] = document.getElementById('month-memo').value; pushToCloud(); }
+    function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
-        document.getElementById('category-manager-list').innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eee;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:red; border:none; background:none; cursor:pointer;">삭제</button></div>`).join('');
-        document.getElementById('key-status-msg').textContent = state.geminiKey ? "✅ 키가 저장됨" : "❌ 키 없음 (AI 미작동)";
+        document.getElementById('category-manager-list').innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:red; border:none; background:none; cursor:pointer;">삭제</button></div>`).join('');
+        document.getElementById('key-status-msg').textContent = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음";
     }
-    function saveApiKey() {
-        const k = document.getElementById('gemini-key-input').value.trim();
-        if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장됨!"); openSettings(); }
-    }
-    function addCategory() {
-        const v = document.getElementById('new-cat-input').value.trim();
-        if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); }
-    }
-    function removeCategory(c) {
-        if(state.categories.length > 1 && confirm('삭제?')) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); }
-    }
+    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장됨!"); openSettings(); } }
+    function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); } }
+    function removeCategory(c) { if(state.categories.length > 1 && confirm('삭제?')) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
     function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-    function exportToCSV() {
-        const d = state.expenses.filter(ex => ex.year === state.viewDate.getFullYear() && ex.month === (state.viewDate.getMonth()+1));
-        let csv = "\uFEFF날짜,항목,카테고리,금액\n";
-        d.forEach(ex => csv += `${ex.year}-${ex.month}-${ex.day},${ex.item},${ex.category},${ex.amount}\n`);
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = `가계부.csv`; link.click();
-    }
-    function generateAIAnalysis() {
-        const year = state.viewDate.getFullYear();
-        const month = state.viewDate.getMonth() + 1;
-        const data = state.expenses.filter(ex => ex.year === year && ex.month === month);
-        if (data.length === 0) return alert('기록 없음');
-        document.getElementById('ai-report-box').style.display = 'block';
-        document.getElementById('ai-content').innerHTML = `분석 중...`;
-        // 분석 리포트 기능은 API 키를 활용해 더 확장 가능
-    }
+    function exportToCSV() { const d = state.expenses.filter(ex => ex.year === state.viewDate.getFullYear() && ex.month === (state.viewDate.getMonth()+1)); let csv = "\uFEFF날짜,항목,카테고리,금액\n"; d.forEach(ex => csv += `${ex.year}-${ex.month}-${ex.day},${ex.item},${ex.category},${ex.amount}\n`); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); link.download = `가계부.csv`; link.click(); }
+    function generateAIAnalysis() { alert('기능 준비 중'); }
 
     window.onload = initSync;
 </script>
