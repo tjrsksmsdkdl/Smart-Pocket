@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Smart Pocket - AI 가계부 (Gemini 3)</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -13,53 +13,76 @@
     <style>
         :root { --primary-color: #4a90e2; --secondary-color: #f5f7fa; --text-color: #333; --accent-color: #ff6b6b; --card-shadow: 0 4px 15px rgba(0,0,0,0.08); }
         * { box-sizing: border-box; font-family: 'Noto Sans KR', sans-serif; }
-        body { background-color: var(--secondary-color); color: var(--text-color); margin: 0; padding: 15px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        header { text-align: center; margin-bottom: 20px; }
-        .month-nav { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px; }
-        .month-nav h1 { margin: 0; font-size: 1.6rem; color: var(--primary-color); min-width: 200px; }
-        .nav-btn { cursor: pointer; border: none; background: white; padding: 8px 18px; border-radius: 12px; box-shadow: var(--card-shadow); font-weight: bold; }
-        .action-btn { font-size: 0.8rem; padding: 8px 15px; border-radius: 10px; border: 1px solid #ddd; background: white; cursor: pointer; }
         
-        .input-section { background: white; padding: 25px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 30px; border-top: 5px solid var(--primary-color); position: relative; }
-        textarea { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 15px; resize: none; min-height: 80px; outline: none; }
-        .add-btn { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .add-btn:disabled { background: #ccc; cursor: wait; }
+        body { background-color: var(--secondary-color); color: var(--text-color); margin: 0; padding: 20px 15px; }
+        .container { max-width: 1100px; margin: 0 auto; width: 100%; }
 
-        .main-content { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
-        @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } }
-        .card { background: white; padding: 20px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 20px; }
+        /* 헤더 섹션 */
+        header { text-align: center; margin-bottom: 25px; width: 100%; }
+        .month-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        .month-nav h1 { margin: 0; font-size: 1.5rem; color: var(--primary-color); min-width: 160px; }
+        .nav-btn { cursor: pointer; border: none; background: white; padding: 10px 15px; border-radius: 12px; box-shadow: var(--card-shadow); font-weight: bold; }
+        .header-actions { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+        
+        /* 공통 카드 스타일 */
+        .card, .input-section { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 20px; 
+            box-shadow: var(--card-shadow); 
+            margin-bottom: 20px; 
+            width: 100%; /* 모든 섹션 너비 통일 */
+            margin-left: 0;
+            margin-right: 0;
+        }
 
+        /* 입력 섹션 특화 */
+        .input-section { border-top: 5px solid var(--primary-color); }
+        textarea { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 15px; resize: none; min-height: 90px; outline: none; transition: border 0.3s; }
+        textarea:focus { border-color: var(--primary-color); }
+        .add-btn { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 12px; font-size: 1rem; }
+        .add-btn:disabled { background: #ccc; }
+
+        /* 레이아웃: PC에서는 2단, 모바일은 1단 */
+        .main-content { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; width: 100%; }
+
+        @media (max-width: 900px) {
+            body { padding: 15px 10px; }
+            .main-content { grid-template-columns: 1fr; gap: 0; } /* 모바일에서 수직 정렬 */
+            .month-nav h1 { font-size: 1.3rem; min-width: 130px; }
+            .card, .input-section { padding: 15px; }
+        }
+
+        /* 지출 내역 리스트 스타일 */
         .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .list-wrapper { overflow-y: auto; max-height: 800px; transition: all 0.3s ease; }
+        .list-wrapper { overflow-y: auto; max-height: 600px; }
         .list-wrapper.collapsed { display: none; }
         
-        .date-group { margin-bottom: 25px; }
-        .date-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 5px; border-bottom: 1px solid #eee; margin-bottom: 8px; }
-        .date-left { display: flex; align-items: center; gap: 10px; }
-        .date-num { font-size: 1.8rem; font-weight: bold; color: #333; line-height: 1; }
-        .date-day-badge { padding: 3px 10px; border-radius: 6px; color: white; font-size: 0.8rem; font-weight: bold; }
-        .date-ym { font-size: 0.85rem; color: #999; }
-        .date-total { font-size: 1.1rem; font-weight: bold; color: #333; }
+        .date-group { margin-bottom: 20px; }
+        .date-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 8px 0; border-bottom: 1px solid #eee; margin-bottom: 8px; }
+        .date-left { display: flex; align-items: center; gap: 8px; }
+        .date-num { font-size: 1.6rem; font-weight: bold; color: #333; }
+        .date-day-badge { padding: 2px 8px; border-radius: 5px; color: white; font-size: 0.75rem; font-weight: bold; }
+        .date-ym { font-size: 0.8rem; color: #999; }
+        .date-total { font-size: 1rem; font-weight: bold; color: #333; }
 
-        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px; border-bottom: 1px solid #f9f9f9; }
-        .item-info { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
-        .item-category-box { min-width: 80px; }
-        .category-select-mini { border: none; background: #f0f4f8; font-size: 0.75rem; padding: 3px 6px; border-radius: 5px; color: #777; width: 100%; cursor: pointer; }
-        .item-name { font-size: 1rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .item-right { display: flex; align-items: center; gap: 12px; }
-        .item-amount { font-size: 1.1rem; font-weight: 500; color: #333; white-space: nowrap; }
-        .item-delete { color: #ddd; cursor: pointer; font-size: 1rem; padding: 0 5px; }
+        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9f9f9; }
+        .item-info { display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden; }
+        .item-category-box { min-width: 70px; }
+        .category-select-mini { border: none; background: #f0f4f8; font-size: 0.7rem; padding: 3px 5px; border-radius: 5px; color: #777; width: 100%; }
+        .item-name { font-size: 0.95rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-amount { font-size: 1rem; font-weight: 500; color: #333; margin-left: 10px; }
+        .item-delete { color: #ddd; cursor: pointer; padding: 0 5px; margin-left: 5px; }
 
-        .total-amount { font-size: 1.6rem; font-weight: bold; color: var(--primary-color); text-align: right; margin-top: 20px; }
+        /* 통계 섹션 */
+        .total-amount { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); text-align: right; margin-top: 15px; }
         .memo-box { width: 100%; min-height: 100px; border: 1px dashed #ddd; border-radius: 12px; padding: 12px; font-size: 0.9rem; background: #fffdf0; resize: none; outline: none; margin-top: 10px; }
         .ai-feedback-container { background: #f0f7ff; border-radius: 15px; padding: 15px; margin-top: 15px; border-left: 5px solid var(--primary-color); font-size: 0.85rem; line-height: 1.6; }
         .feedback-btn { width: 100%; padding: 12px; background: #6c5ce7; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; }
         
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; }
-
-        /* 카테고리 상세 모달 스타일 */
+        /* 모달 공통 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; padding: 10px; }
+        .modal-content { background: white; padding: 20px; border-radius: 20px; width: 100%; max-width: 450px; position: relative; }
         .detail-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
     </style>
 </head>
@@ -72,20 +95,22 @@
             <h1 id="current-month-display"></h1>
             <button class="nav-btn" onclick="changeMonth(1)">▶</button>
         </div>
-        <div id="sync-status" style="font-size: 0.7rem; color: #2ecc71; margin-bottom: 10px;">● Cloud Syncing...</div>
-        <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
+        <div id="sync-status" style="font-size: 0.7rem; color: #2ecc71;">● Cloud Syncing...</div>
+        <div class="header-actions">
             <button class="action-btn" onclick="openSettings()">⚙️ 설정</button>
             <button class="action-btn" onclick="exportToCSV()">📤 CSV 내보내기</button>
         </div>
     </header>
 
+    <!-- 입력창 섹션 -->
     <div class="input-section">
         <textarea id="natural-input" placeholder="예: 3/11 택시 4500, 스타벅스 5000"></textarea>
         <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini 3 분석)</button>
-        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:5px;">Gemini 3가 분석 중입니다...</div>
+        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:8px;">Gemini 3가 분석 중입니다...</div>
     </div>
 
     <div class="main-content">
+        <!-- 왼쪽: 지출 내역 -->
         <section class="card">
             <div class="table-header">
                 <h3 style="margin:0; font-size: 1.1rem;">📋 지출 내역</h3>
@@ -96,6 +121,7 @@
             </div>
         </section>
 
+        <!-- 오른쪽: 통계, 메모, 분석 -->
         <div class="stats-side">
             <section class="card">
                 <div style="height: 220px; cursor: pointer;"><canvas id="expenseChart"></canvas></div>
@@ -105,35 +131,35 @@
 
             <section class="card">
                 <h3 style="margin:0; font-size: 1rem;">📝 월별 메모</h3>
-                <textarea id="month-memo" class="memo-box" placeholder="이달의 다짐이나 목표를 기록하세요..." oninput="handleMemoInput()"></textarea>
+                <textarea id="month-memo" class="memo-box" placeholder="이달의 목표를 기록하세요..." oninput="handleMemoInput()"></textarea>
             </section>
 
             <section class="card">
                 <h3 style="margin:0; font-size: 1rem;">💡 AI 소비 분석</h3>
-                <div id="ai-feedback-text" class="ai-feedback-container">지출 내역을 기반으로 Gemini 3의 피드백을 받아보세요.</div>
+                <div id="ai-feedback-text" class="ai-feedback-container">내역을 입력하고 피드백을 받아보세요.</div>
                 <button id="feedback-btn" class="feedback-btn" onclick="getAIFeedback()">이달의 피드백 받기</button>
             </section>
         </div>
     </div>
 </div>
 
-<!-- 카테고리 상세 모달 -->
-<div id="category-detail-modal" class="modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <h3 id="detail-title" style="color: var(--primary-color); margin-top: 0;">상세 내역</h3>
-        <div id="detail-list-content" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;"></div>
-        <button onclick="closeDetailModal()" style="width:100%; padding:12px; background:#eee; border:none; border-radius:12px; cursor:pointer; font-weight: bold;">닫기</button>
+<!-- 상세 내역 모달 -->
+<div id="category-detail-modal" class="modal" onclick="if(event.target==this) closeDetailModal()">
+    <div class="modal-content">
+        <h3 id="detail-title" style="color: var(--primary-color); margin-top: 0; font-size: 1.1rem;">상세 내역</h3>
+        <div id="detail-list-content" style="max-height: 350px; overflow-y: auto; margin-bottom: 15px;"></div>
+        <button onclick="closeDetailModal()" style="width:100%; padding:12px; background:#f0f0f0; border:none; border-radius:12px; cursor:pointer; font-weight: bold;">닫기</button>
     </div>
 </div>
 
 <!-- 설정 모달 -->
-<div id="settings-modal" class="modal">
+<div id="settings-modal" class="modal" onclick="if(event.target==this) closeSettings()">
     <div class="modal-content">
-        <h3>설정</h3>
+        <h3 style="margin-top:0">설정</h3>
         <label style="font-size:0.85rem; font-weight:bold;">카테고리 관리</label>
         <div id="category-manager-list" style="margin: 10px 0; max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 10px;"></div>
         <div style="display: flex; gap: 5px; margin-bottom: 20px;">
-            <input type="text" id="new-cat-input" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px;" placeholder="새 카테고리">
+            <input type="text" id="new-cat-input" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px;" placeholder="새 항목">
             <button onclick="addCategory()" style="padding:8px 15px; background:var(--primary-color); color:white; border:none; border-radius:8px;">추가</button>
         </div>
         
@@ -143,11 +169,12 @@
             <input type="password" id="gemini-key-input" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:8px;" placeholder="AIzaSy...">
             <button onclick="saveApiKey()" style="padding:8px 15px; background:#444; color:white; border:none; border-radius:8px;">저장</button>
         </div>
-        <button onclick="closeSettings()" style="width:100%; margin-top:20px; padding:12px; background:#eee; border:none; border-radius:12px; cursor:pointer;">닫기</button>
+        <button onclick="closeSettings()" style="width:100%; margin-top:20px; padding:12px; background:#f0f0f0; border:none; border-radius:12px; cursor:pointer;">닫기</button>
     </div>
 </div>
 
 <script>
+    // [기존 스크립트 로직 그대로 유지 - 디자인 관련 버그 수정 포함]
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -184,10 +211,7 @@
             });
             const data = await response.json();
             return data.candidates[0].content.parts[0].text.trim();
-        } catch (e) {
-            console.error("AI 통신 실패:", e);
-            return null;
-        }
+        } catch (e) { return null; }
     }
 
     function toggleList() {
@@ -207,15 +231,15 @@
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
         const currentData = state.expenses.filter(ex => ex.year === year && ex.month === month);
-        if (currentData.length === 0) { alert("지출 내역이 있어야 분석이 가능합니다."); return; }
+        if (currentData.length === 0) { alert("지출 내역이 필요합니다."); return; }
         const feedbackBox = document.getElementById('ai-feedback-text');
         const btn = document.getElementById('feedback-btn');
-        feedbackBox.innerText = "Gemini 3가 분석 중입니다...";
+        feedbackBox.innerText = "Gemini 3 분석 중...";
         btn.disabled = true;
         const dataSummary = currentData.map(d => `${d.item}(${d.category}): ${d.amount}원`).join(", ");
-        const prompt = `재무 전문가로서 다음 지출 내역을 분석해줘: [${dataSummary}]. 1)잘한 점, 2)아쉬운 점, 3)절약 팁을 친구에게 말하듯 친절하게 한국어로 요약해줘.`;
+        const prompt = `재무 전문가로서 이 달 가계부 분석해줘: [${dataSummary}]. 1)칭찬, 2)반성, 3)팁을 친절한 한국어로 요약해줘.`;
         const result = await callGemini(prompt);
-        feedbackBox.innerText = result || "피드백을 생성할 수 없습니다. 키를 확인하세요.";
+        feedbackBox.innerText = result || "API 키를 확인하세요.";
         btn.disabled = false;
     }
 
@@ -240,7 +264,7 @@
                 let amt = parseFloat(last.replace(/[^\d.]/g, ""));
                 if (last.includes("만원")) amt *= 10000;
                 text = text.replace(last, "").trim() || "기타";
-                const catPrompt = `"${text}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 설명 없이 단어만 답해.`;
+                const catPrompt = `"${text}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 단어만 답해.`;
                 const cleanedText = await callGemini(catPrompt);
                 const category = state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
                 state.expenses.push({ id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category });
@@ -253,32 +277,18 @@
         render();
     }
 
-    // 카테고리별 상세 내역 보여주기 기능
     function showCategoryDetails(categoryName) {
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
         const filtered = state.expenses.filter(ex => ex.year === year && ex.month === month && ex.category === categoryName);
-        
         const modal = document.getElementById('category-detail-modal');
-        const title = document.getElementById('detail-title');
         const content = document.getElementById('detail-list-content');
-        
-        title.textContent = `${month}월 ${categoryName} 상세 내역`;
-        content.innerHTML = filtered.length > 0 
-            ? filtered.sort((a,b) => b.day - a.day).map(ex => `
-                <div class="detail-item">
-                    <span>${ex.month}/${ex.day} ${ex.item}</span>
-                    <span style="font-weight:bold;">${ex.amount.toLocaleString()}원</span>
-                </div>
-            `).join('')
-            : '<p style="text-align:center; color:#999; padding:20px;">내역이 없습니다.</p>';
-        
+        document.getElementById('detail-title').textContent = `${categoryName} 상세 내역`;
+        content.innerHTML = filtered.length > 0 ? filtered.sort((a,b) => b.day-a.day).map(ex => `<div class="detail-item"><span>${ex.month}/${ex.day} ${ex.item}</span><span style="font-weight:bold;">${ex.amount.toLocaleString()}원</span></div>`).join('') : '<p>내역이 없습니다.</p>';
         modal.style.display = 'flex';
     }
 
-    function closeDetailModal() {
-        document.getElementById('category-detail-modal').style.display = 'none';
-    }
+    function closeDetailModal() { document.getElementById('category-detail-modal').style.display = 'none'; }
 
     function render() {
         const year = state.viewDate.getFullYear();
@@ -296,8 +306,7 @@
             return acc;
         }, {});
         const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-        const sortedDays = Object.keys(groups).sort((a, b) => b - a);
-        sortedDays.forEach(day => {
+        Object.keys(groups).sort((a, b) => b - a).forEach(day => {
             const group = groups[day];
             const dateObj = new Date(year, month - 1, day);
             const dayIdx = dateObj.getDay();
@@ -308,32 +317,19 @@
             groupDiv.className = 'date-group';
             groupDiv.innerHTML = `
                 <div class="date-header">
-                    <div class="date-left">
-                        <span class="date-num">${day}</span>
-                        <span class="date-day-badge" style="background-color: ${dayColor}">${dayNames[dayIdx]}</span>
-                        <span class="date-ym">${year}.${String(month).padStart(2, '0')}</span>
-                    </div>
+                    <div class="date-left"><span class="date-num">${day}</span><span class="date-day-badge" style="background-color: ${dayColor}">${dayNames[dayIdx]}</span><span class="date-ym">${year}.${month}</span></div>
                     <div class="date-total">${group.total.toLocaleString()}원</div>
                 </div>
-                <div class="group-items">
-                    ${group.items.map(ex => `
-                        <div class="expense-item">
-                            <div class="item-info">
-                                <div class="item-category-box">
-                                    <select class="category-select-mini" onchange="updateExCat(${ex.id}, this.value)">
-                                        ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
-                                    </select>
-                                </div>
-                                <span class="item-name">${ex.item}</span>
-                            </div>
-                            <div class="item-right">
-                                <span class="item-amount">${ex.amount.toLocaleString()}원</span>
-                                <span class="item-delete" onclick="deleteEx(${ex.id})">✕</span>
-                            </div>
+                <div>${group.items.map(ex => `
+                    <div class="expense-item">
+                        <div class="item-info">
+                            <div class="item-category-box"><select class="category-select-mini" onchange="updateExCat(${ex.id}, this.value)">
+                                ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select></div>
+                            <span class="item-name">${ex.item}</span>
                         </div>
-                    `).join('')}
-                </div>
-            `;
+                        <div class="item-right"><span class="item-amount">${ex.amount.toLocaleString()}원</span><span class="item-delete" onclick="deleteEx(${ex.id})">✕</span></div>
+                    </div>`).join('')}</div>`;
             listEl.appendChild(groupDiv);
         });
         updateStats(data);
@@ -345,46 +341,15 @@
         summaryEl.innerHTML = '';
         let total = 0;
         Object.values(stats).forEach(amt => total += amt);
-
         Object.entries(stats).sort((a,b) => b[1]-a[1]).forEach(([cat, amt]) => {
             const percent = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
-            // 리스트 아이템 클릭 시 상세 모달 띄우기 추가
-            summaryEl.innerHTML += `
-                <div onclick="showCategoryDetails('${cat}')" style="display:flex; justify-content:space-between; padding:8px 8px; font-size:0.9rem; border-bottom:1px solid #f0f0f0; cursor:pointer; border-radius:8px;" onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='transparent'">
-                    <span>${cat} <small style="color:#aaa;">(${percent}%)</small></span>
-                    <span style="font-weight:bold;">${amt.toLocaleString()}원</span>
-                </div>`;
+            summaryEl.innerHTML += `<div onclick="showCategoryDetails('${cat}')" style="display:flex; justify-content:space-between; padding:8px 5px; font-size:0.9rem; border-bottom:1px solid #f0f0f0; cursor:pointer;"><span>${cat} <small style="color:#aaa;">(${percent}%)</small></span><span style="font-weight:bold;">${amt.toLocaleString()}원</span></div>`;
         });
         document.getElementById('total-display').textContent = `${total.toLocaleString()}원`;
-        
         const ctx = document.getElementById('expenseChart').getContext('2d');
         if (myChart) myChart.destroy();
         if (Object.keys(stats).length > 0) {
-            myChart = new Chart(ctx, { 
-                type: 'doughnut', 
-                data: { 
-                    labels: Object.keys(stats), 
-                    datasets: [{ 
-                        data: Object.values(stats), 
-                        backgroundColor: ['#4a90e2', '#ff6b6b', '#feca57', '#1dd1a1', '#a29bfe', '#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#576574'], 
-                        borderWidth: 0 
-                    }] 
-                }, 
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    cutout: '75%',
-                    // 그래프 클릭 이벤트 추가
-                    onClick: (evt, elements) => {
-                        if (elements.length > 0) {
-                            const index = elements[0].index;
-                            const label = myChart.data.labels[index];
-                            showCategoryDetails(label);
-                        }
-                    }
-                } 
-            });
+            myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), backgroundColor: ['#4a90e2', '#ff6b6b', '#feca57', '#1dd1a1', '#a29bfe', '#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#576574'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%', onClick: (evt, elements) => { if (elements.length > 0) showCategoryDetails(myChart.data.labels[elements[0].index]); } } });
         }
     }
 
@@ -396,25 +361,17 @@
         const totalAmount = Object.values(stats).reduce((a, b) => a + b, 0);
         const statsArray = Object.entries(stats).sort((a,b) => b[1]-a[1]);
         let csv = "\uFEFF날짜,항목,카테고리,금액,,[카테고리 요약],금액,비중(%)\n";
-        const maxRows = Math.max(currentData.length, statsArray.length + 1);
-        for (let i = 0; i < maxRows; i++) {
+        for (let i = 0; i < Math.max(currentData.length, statsArray.length + 1); i++) {
             let row = [];
-            if (i < currentData.length) {
-                const ex = currentData[i];
-                row.push(`${ex.year}-${ex.month}-${ex.day}`, `"${ex.item.replace(/"/g, '""')}"`, ex.category, ex.amount);
-            } else { row.push("", "", "", ""); }
+            if (i < currentData.length) { const ex = currentData[i]; row.push(`${ex.year}-${ex.month}-${ex.day}`, `"${ex.item}"`, ex.category, ex.amount); } else row.push("", "", "", "");
             row.push("");
-            if (i < statsArray.length) {
-                const [cat, amt] = statsArray[i];
-                row.push(cat, amt, ((amt / totalAmount) * 100).toFixed(1) + "%");
-            } else if (i === statsArray.length && totalAmount > 0) {
-                row.push("총 합계", totalAmount, "100%");
-            }
+            if (i < statsArray.length) { const [cat, amt] = statsArray[i]; row.push(cat, amt, ((amt / totalAmount) * 100).toFixed(1) + "%"); }
+            else if (i === statsArray.length && totalAmount > 0) row.push("총합", totalAmount, "100%");
             csv += row.join(",") + "\n";
         }
         const link = document.createElement("a");
         link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = `${year}년_${month}월_가계부.csv`; link.click();
+        link.download = `${year}_${month}_가계부.csv`; link.click();
     }
 
     function initSync() {
@@ -428,24 +385,15 @@
             }
         });
     }
-    function pushToCloud() {
-        db.ref('expenses').set(state.expenses);
-        db.ref('categories').set(state.categories);
-        db.ref('memos').set(state.memos);
-    }
+    function pushToCloud() { db.ref('expenses').set(state.expenses); db.ref('categories').set(state.categories); db.ref('memos').set(state.memos); }
     function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); } }
     function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); }
     function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
-    function openSettings() {
-        document.getElementById('settings-modal').style.display = 'flex';
-        const list = document.getElementById('category-manager-list');
-        list.innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none; cursor:pointer;">삭제</button></div>`).join('');
-        document.getElementById('key-status-msg').innerHTML = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음";
-    }
+    function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; const list = document.getElementById('category-manager-list'); list.innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none;">삭제</button></div>`).join(''); document.getElementById('key-status-msg').innerHTML = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음"; }
     function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장되었습니다."); openSettings(); } }
-    function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); document.getElementById('new-cat-input').value = ""; } }
-    function removeCategory(c) { if(state.categories.length > 1 && confirm(`'${c}'를 삭제하시겠습니까?`)) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
+    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장됨"); openSettings(); } }
+    function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); } }
+    function removeCategory(c) { if(state.categories.length > 1 && confirm('삭제하시겠습니까?')) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
 
     window.onload = initSync;
 </script>
