@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Pocket - AI 가계부 (Gemini 3)</title>
+    <title>Smart Pocket - AI 가계부 (Gemini)</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -62,7 +62,7 @@
         .category-select-mini { border: none; background: #f0f4f8; font-size: 0.75rem; padding: 3px 6px; border-radius: 5px; color: #777; width: 100%; cursor: pointer; }
         .item-name { font-size: 1rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .item-right { display: flex; align-items: center; gap: 12px; }
-        .item-amount { font-size: 1.1rem; font-weight: 500; color: #333; } /* 강조색 없음 */
+        .item-amount { font-size: 1.1rem; font-weight: 500; color: #333; }
         .item-delete { color: #ddd; cursor: pointer; font-size: 1rem; padding: 0 5px; }
 
         /* 통계 및 분석 */
@@ -107,8 +107,8 @@
 
     <div class="input-section">
         <textarea id="natural-input" placeholder="예: 3/11 택시 4500, 스타벅스 5000"></textarea>
-        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini 3 분석)</button>
-        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:8px;">Gemini 3 분석 중...</div>
+        <button id="add-btn" class="add-btn" onclick="handleAdd()">기록하기 (Gemini 분석)</button>
+        <div id="ai-loader" style="display:none; text-align:center; font-size:0.8rem; color:var(--primary-color); margin-top:8px;">AI 분석 중...</div>
     </div>
 
     <div class="main-content">
@@ -199,7 +199,12 @@
     };
 
     let myChart = null;
-    const modelName = "gemini-3-flash-preview";
+
+    // 지출 항목 자동 분류용 (가벼운 모델, 호출 수 많음)
+    const classifyModelName = "gemini-2.5-flash-lite";
+
+    // 월별 소비 분석/피드백용 (조금 더 똑똑한 모델)
+    const feedbackModelName = "gemini-2.5-flash"; // 필요하면 "gemini-2.5-pro"로 변경 가능
 
     function login() { auth.signInWithRedirect(provider); }
     function logout() { if(confirm("로그아웃 하시겠습니까?")) auth.signOut().then(() => location.reload()); }
@@ -251,7 +256,8 @@
         }
     }
 
-    async function callGemini(prompt) {
+    // 공통 Gemini 호출 함수 (모델명을 인자로 받도록 변경)
+    async function callGemini(prompt, modelName) {
         if (!state.geminiKey) return null;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${state.geminiKey}`;
         try {
@@ -261,8 +267,11 @@
                 body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
             });
             const data = await response.json();
+            if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) return null;
             return data.candidates[0].content.parts[0].text.trim();
-        } catch (e) { return null; }
+        } catch (e) {
+            return null;
+        }
     }
 
     async function handleAdd() {
@@ -271,27 +280,42 @@
         const loader = document.getElementById('ai-loader');
         const btn = document.getElementById('add-btn');
         btn.disabled = true; loader.style.display = 'block';
+
         const segments = inp.value.split(/[,|\n]/).map(s => s.trim()).filter(s => s.length > 0);
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
         let day = new Date().getDate();
+
         for (const seg of segments) {
             let text = seg;
+
             const dateMatch = text.match(/(\d{1,2})[월\/](\d{1,2})일?/);
-            if (dateMatch) { day = parseInt(dateMatch[2]); text = text.replace(dateMatch[0], "").trim(); }
+            if (dateMatch) { 
+                day = parseInt(dateMatch[2]); 
+                text = text.replace(dateMatch[0], "").trim(); 
+            }
+
             const amtMatch = text.match(/(\d[\d,.]*)\s*(만원|원)?/g);
             if (amtMatch) {
                 const last = amtMatch[amtMatch.length - 1];
                 let amt = parseFloat(last.replace(/[^\d.]/g, ""));
                 if (last.includes("만원")) amt *= 10000;
                 text = text.replace(last, "").trim() || "기타";
-                const catPrompt = `"${text}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 단어만 답해.`;
-                const cleanedText = await callGemini(catPrompt);
+
+                // 분류용 모델 사용
+                const catPrompt = `"${text}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 카테고리 이름만 한 단어로 답해.`;
+                const cleanedText = await callGemini(catPrompt, classifyModelName);
                 const category = state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
+
                 state.expenses.push({ id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category });
             }
         }
-        inp.value = ''; pushToCloud(); btn.disabled = false; loader.style.display = 'none'; render();
+
+        inp.value = '';
+        pushToCloud();
+        btn.disabled = false;
+        loader.style.display = 'none';
+        render();
     }
 
     function render() {
@@ -299,91 +323,228 @@
         const month = state.viewDate.getMonth() + 1;
         const display = document.getElementById('current-month-display');
         if (display) display.textContent = `${year}년 ${month}월`;
+
         const memoKey = `${year}-${month}`;
         document.getElementById('month-memo').value = state.memos[memoKey] || "";
+
         const data = state.expenses.filter(ex => ex.year === year && ex.month === month);
         const listEl = document.getElementById('expense-list');
         listEl.innerHTML = '';
+
         const groups = data.reduce((acc, ex) => {
             if (!acc[ex.day]) acc[ex.day] = { items: [], total: 0 };
-            acc[ex.day].items.push(ex); acc[ex.day].total += ex.amount;
+            acc[ex.day].items.push(ex); 
+            acc[ex.day].total += ex.amount;
             return acc;
         }, {});
+
         const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
         Object.keys(groups).sort((a, b) => b - a).forEach(day => {
             const group = groups[day];
             const dayIdx = new Date(year, month - 1, day).getDay();
             let dayColor = dayIdx === 0 ? '#ff6b6b' : (dayIdx === 6 ? '#4a90e2' : '#888');
+
             const groupDiv = document.createElement('div');
             groupDiv.className = 'date-group';
-            groupDiv.innerHTML = `<div class="date-header"><div class="date-left"><span class="date-num">${day}</span><span class="date-day-badge" style="background-color: ${dayColor}">${dayNames[dayIdx]}</span><span class="date-ym">${year}.${month}</span></div><div class="date-total">${group.total.toLocaleString()}원</div></div>
-                ${group.items.map(ex => `<div class="expense-item"><div class="item-info"><div class="item-category-box"><select class="category-select-mini" onchange="updateExCat(${ex.id}, this.value)">${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><span class="item-name">${ex.item}</span></div><div class="item-right"><span class="item-amount">${ex.amount.toLocaleString()}원</span><span class="item-delete" onclick="deleteEx(${ex.id})">✕</span></div></div>`).join('')}`;
+            groupDiv.innerHTML = `
+                <div class="date-header">
+                    <div class="date-left">
+                        <span class="date-num">${day}</span>
+                        <span class="date-day-badge" style="background-color: ${dayColor}">${dayNames[dayIdx]}</span>
+                        <span class="date-ym">${year}.${month}</span>
+                    </div>
+                    <div class="date-total">${group.total.toLocaleString()}원</div>
+                </div>
+                ${
+                    group.items.map(ex => `
+                        <div class="expense-item">
+                            <div class="item-info">
+                                <div class="item-category-box">
+                                    <select class="category-select-mini" onchange="updateExCat(${ex.id}, this.value)">
+                                        ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <span class="item-name">${ex.item}</span>
+                            </div>
+                            <div class="item-right">
+                                <span class="item-amount">${ex.amount.toLocaleString()}원</span>
+                                <span class="item-delete" onclick="deleteEx(${ex.id})">✕</span>
+                            </div>
+                        </div>
+                    `).join('')
+                }`;
             listEl.appendChild(groupDiv);
         });
+
         updateStats(data);
     }
 
     function updateStats(data) {
-        const stats = data.reduce((acc, curr) => { acc[curr.category] = (acc[curr.category] || 0) + curr.amount; return acc; }, {});
+        const stats = data.reduce((acc, curr) => { 
+            acc[curr.category] = (acc[curr.category] || 0) + curr.amount; 
+            return acc; 
+        }, {});
+
         const summaryEl = document.getElementById('summary-list');
-        summaryEl.innerHTML = ''; let total = 0;
+        summaryEl.innerHTML = ''; 
+        let total = 0;
         Object.values(stats).forEach(amt => total += amt);
+
         Object.entries(stats).sort((a,b) => b[1]-a[1]).forEach(([cat, amt]) => {
             const percent = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
-            summaryEl.innerHTML += `<div onclick="showCategoryDetails('${cat}')" style="display:flex; justify-content:space-between; padding:8px 5px; font-size:0.9rem; border-bottom:1px solid #f0f0f0; cursor:pointer;"><span>${cat} <small style="color:#aaa;">(${percent}%)</small></span><span style="font-weight:bold;">${amt.toLocaleString()}원</span></div>`;
+            summaryEl.innerHTML += `
+                <div onclick="showCategoryDetails('${cat}')" style="display:flex; justify-content:space-between; padding:8px 5px; font-size:0.9rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
+                    <span>${cat} <small style="color:#aaa;">(${percent}%)</small></span>
+                    <span style="font-weight:bold;">${amt.toLocaleString()}원</span>
+                </div>`;
         });
+
         document.getElementById('total-display').textContent = `${total.toLocaleString()}원`;
+
         const ctx = document.getElementById('expenseChart').getContext('2d');
         if (myChart) myChart.destroy();
         if (Object.keys(stats).length > 0) {
-            myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), backgroundColor: ['#4a90e2', '#ff6b6b', '#feca57', '#1dd1a1', '#a29bfe', '#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#576574'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%', onClick: (evt, elements) => { if (elements.length > 0) showCategoryDetails(myChart.data.labels[elements[0].index]); } } });
+            myChart = new Chart(ctx, { 
+                type: 'doughnut', 
+                data: { 
+                    labels: Object.keys(stats), 
+                    datasets: [{ 
+                        data: Object.values(stats), 
+                        backgroundColor: ['#4a90e2', '#ff6b6b', '#feca57', '#1dd1a1', '#a29bfe', '#ff9f43', '#ee5253', '#0abde3', '#10ac84', '#576574'], 
+                        borderWidth: 0 
+                    }] 
+                }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    cutout: '75%', 
+                    onClick: (evt, elements) => { 
+                        if (elements.length > 0) showCategoryDetails(myChart.data.labels[elements[0].index]); 
+                    } 
+                } 
+            });
         }
     }
 
     function showCategoryDetails(cat) {
-        const year = state.viewDate.getFullYear(); const month = state.viewDate.getMonth() + 1;
+        const year = state.viewDate.getFullYear(); 
+        const month = state.viewDate.getMonth() + 1;
         const filtered = state.expenses.filter(ex => ex.year === year && ex.month === month && ex.category === cat);
         document.getElementById('detail-title').textContent = `${cat} 상세 내역`;
-        document.getElementById('detail-list-content').innerHTML = filtered.sort((a,b) => b.day-a.day).map(ex => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${ex.month}/${ex.day} ${ex.item}</span><span style="font-weight:bold;">${ex.amount.toLocaleString()}원</span></div>`).join('');
+        document.getElementById('detail-list-content').innerHTML = filtered
+            .sort((a,b) => b.day-a.day)
+            .map(ex => `
+                <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;">
+                    <span>${ex.month}/${ex.day} ${ex.item}</span>
+                    <span style="font-weight:bold;">${ex.amount.toLocaleString()}원</span>
+                </div>
+            `).join('');
         document.getElementById('category-detail-modal').style.display = 'flex';
     }
 
     function closeDetailModal() { document.getElementById('category-detail-modal').style.display = 'none'; }
     function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
-    function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); } }
-    function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); }
-    function handleMemoInput() { const key = `${state.viewDate.getFullYear()}-${state.viewDate.getMonth() + 1}`; state.memos[key] = document.getElementById('month-memo').value; pushToCloud(); }
+    function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); render(); } }
+    function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); render(); }
+    function handleMemoInput() { 
+        const key = `${state.viewDate.getFullYear()}-${state.viewDate.getMonth() + 1}`; 
+        state.memos[key] = document.getElementById('month-memo').value; 
+        pushToCloud(); 
+    }
+
     async function getAIFeedback() { 
-        const year = state.viewDate.getFullYear(); const month = state.viewDate.getMonth() + 1;
+        const year = state.viewDate.getFullYear(); 
+        const month = state.viewDate.getMonth() + 1;
         const currentData = state.expenses.filter(ex => ex.year === year && ex.month === month);
         if (currentData.length === 0) return;
+
         document.getElementById('ai-feedback-text').innerText = "분석 중...";
+
         const dataSummary = currentData.map(d => `${d.item}(${d.category}): ${d.amount}원`).join(", ");
-        const result = await callGemini(`재무 전문가 분석: [${dataSummary}]. 1)칭찬, 2)반성, 3)팁 요약해줘.`);
-        document.getElementById('ai-feedback-text').innerText = result || "키 확인 필요";
+
+        const prompt = `너는 친절한 한국인 재무 상담가야. 다음 한 달 소비내역을 보고 1) 잘한 점, 2) 아쉬운 점, 3) 다음 달을 위한 구체적인 실천 팁을 각 항목별로 간단히 bullet으로 정리해서 말해줘. 너무 길게 쓰지 말고 핵심만 말해줘.
+[소비 내역] ${dataSummary}`;
+
+        // 피드백용 모델 사용
+        const result = await callGemini(prompt, feedbackModelName);
+        document.getElementById('ai-feedback-text').innerText = result || "AI 키 또는 모델 설정을 확인해주세요.";
     }
-    function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; const list = document.getElementById('category-manager-list'); list.innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none;">삭제</button></div>`).join(''); }
+
+    function openSettings() { 
+        document.getElementById('settings-modal').style.display = 'flex'; 
+        const list = document.getElementById('category-manager-list'); 
+        list.innerHTML = state.categories
+            .map(c => `
+                <div style="display:flex; justify-content:space-between; padding:5px 0;">
+                    <span>${c}</span>
+                    <button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none;">삭제</button>
+                </div>
+            `).join(''); 
+    }
     function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장됨"); openSettings(); } }
-    function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); } }
-    function removeCategory(c) { if(state.categories.length > 1 && confirm('삭제?')) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
+
+    function saveApiKey() { 
+        const k = document.getElementById('gemini-key-input').value.trim(); 
+        if(k) { 
+            state.geminiKey = k; 
+            localStorage.setItem('sp_gemini_key', k); 
+            alert("Gemini API Key가 저장되었습니다."); 
+            openSettings(); 
+        } 
+    }
+
+    function addCategory() { 
+        const v = document.getElementById('new-cat-input').value.trim(); 
+        if(v && !state.categories.includes(v)) { 
+            state.categories.push(v); 
+            pushToCloud(); 
+            openSettings(); 
+            document.getElementById('new-cat-input').value = "";
+        } 
+    }
+
+    function removeCategory(c) { 
+        if(state.categories.length > 1 && confirm('정말 이 카테고리를 삭제하시겠습니까?')) { 
+            state.categories = state.categories.filter(x => x !== c); 
+            pushToCloud(); 
+            openSettings(); 
+        } 
+    }
+
     function exportToCSV() {
-        const year = state.viewDate.getFullYear(); const month = state.viewDate.getMonth() + 1;
+        const year = state.viewDate.getFullYear(); 
+        const month = state.viewDate.getMonth() + 1;
         const currentData = state.expenses.filter(ex => ex.year === year && ex.month === month);
-        const stats = currentData.reduce((acc, curr) => { acc[curr.category] = (acc[curr.category] || 0) + curr.amount; return acc; }, {});
+        const stats = currentData.reduce((acc, curr) => { 
+            acc[curr.category] = (acc[curr.category] || 0) + curr.amount; 
+            return acc; 
+        }, {});
         const totalAmount = Object.values(stats).reduce((a, b) => a + b, 0);
         const statsArray = Object.entries(stats).sort((a,b) => b[1]-a[1]);
+
         let csv = "\uFEFF날짜,항목,카테고리,금액,,[요약],금액,비중\n";
         for (let i = 0; i < Math.max(currentData.length, statsArray.length + 1); i++) {
             let row = [];
-            if (i < currentData.length) { const ex = currentData[i]; row.push(`${ex.year}-${ex.month}-${ex.day}`, `"${ex.item}"`, ex.category, ex.amount); } else row.push("", "", "", "");
+            if (i < currentData.length) { 
+                const ex = currentData[i]; 
+                row.push(`${ex.year}-${ex.month}-${ex.day}`, `"${ex.item}"`, ex.category, ex.amount); 
+            } else row.push("", "", "", "");
             row.push("");
-            if (i < statsArray.length) { const [cat, amt] = statsArray[i]; row.push(cat, amt, ((amt / totalAmount) * 100).toFixed(1) + "%"); }
-            else if (i === statsArray.length && totalAmount > 0) row.push("총합", totalAmount, "100%");
+            if (i < statsArray.length) { 
+                const [cat, amt] = statsArray[i]; 
+                row.push(cat, amt, ((amt / totalAmount) * 100).toFixed(1) + "%"); 
+            }
+            else if (i === statsArray.length && totalAmount > 0) 
+                row.push("총합", totalAmount, "100%");
             csv += row.join(",") + "\n";
         }
-        const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = `${year}_${month}_가계부.csv`; link.click();
+
+        const link = document.createElement("a"); 
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.download = `${year}_${month}_가계부.csv`; 
+        link.click();
     }
 </script>
 </body>
