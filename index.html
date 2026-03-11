@@ -20,27 +20,49 @@
         .month-nav h1 { margin: 0; font-size: 1.6rem; color: var(--primary-color); min-width: 200px; }
         .nav-btn { cursor: pointer; border: none; background: white; padding: 8px 18px; border-radius: 12px; box-shadow: var(--card-shadow); font-weight: bold; }
         .action-btn { font-size: 0.8rem; padding: 8px 15px; border-radius: 10px; border: 1px solid #ddd; background: white; cursor: pointer; }
+        
+        /* 입력 섹션 */
         .input-section { background: white; padding: 25px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 30px; border-top: 5px solid var(--primary-color); position: relative; }
         textarea { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 15px; resize: none; min-height: 80px; outline: none; }
         .add-btn { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; }
         .add-btn:disabled { background: #ccc; cursor: wait; }
+
         .main-content { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
         @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } }
         .card { background: white; padding: 20px; border-radius: 20px; box-shadow: var(--card-shadow); margin-bottom: 20px; }
-        .table-wrapper { overflow-x: auto; max-height: 500px; transition: all 0.3s ease; }
-        .table-wrapper.collapsed { display: none; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th { position: sticky; top: 0; background: white; padding: 12px; border-bottom: 2px solid #f0f0f0; text-align: left; color: #888; }
-        td { padding: 12px; border-bottom: 1px solid #f9f9f9; }
-        .category-select { border: none; background: #f0f4f8; padding: 5px; border-radius: 6px; font-size: 0.8rem; width: 100%; cursor: pointer; }
+
+        /* 지출 내역 리스트 (이미지 스타일 개편) */
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .list-wrapper { overflow-y: auto; max-height: 800px; transition: all 0.3s ease; }
+        .list-wrapper.collapsed { display: none; }
+        
+        .date-group { margin-bottom: 25px; }
+        .date-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 5px; border-bottom: 1px solid #eee; margin-bottom: 8px; }
+        .date-left { display: flex; align-items: center; gap: 10px; }
+        .date-num { font-size: 1.8rem; font-weight: bold; color: #333; line-height: 1; }
+        .date-day-badge { padding: 3px 10px; border-radius: 6px; color: white; font-size: 0.8rem; font-weight: bold; }
+        .date-ym { font-size: 0.85rem; color: #999; }
+        .date-total { font-size: 1.1rem; font-weight: bold; color: #333; } /* 강조색 제거 */
+
+        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 5px; border-bottom: 1px solid #f9f9f9; }
+        .item-info { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
+        .item-category-box { min-width: 80px; }
+        .category-select-mini { border: none; background: #f0f4f8; font-size: 0.75rem; padding: 3px 6px; border-radius: 5px; color: #777; width: 100%; cursor: pointer; }
+        .item-name { font-size: 1rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-right { display: flex; align-items: center; gap: 12px; }
+        .item-amount { font-size: 1.1rem; font-weight: 500; color: #333; white-space: nowrap; } /* 강조색 제거 */
+        .item-delete { color: #ddd; cursor: pointer; font-size: 1rem; padding: 0 5px; }
+        .item-delete:hover { color: var(--accent-color); }
+
+        /* 사이드바 요소 */
         .total-amount { font-size: 1.6rem; font-weight: bold; color: var(--primary-color); text-align: right; margin-top: 20px; }
+        .memo-box { width: 100%; min-height: 100px; border: 1px dashed #ddd; border-radius: 12px; padding: 12px; font-size: 0.9rem; background: #fffdf0; resize: none; outline: none; margin-top: 10px; }
+        .ai-feedback-container { background: #f0f7ff; border-radius: 15px; padding: 15px; margin-top: 15px; border-left: 5px solid var(--primary-color); font-size: 0.85rem; line-height: 1.6; }
+        .feedback-btn { width: 100%; padding: 12px; background: #6c5ce7; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        
+        /* 모달 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; }
-
-        .memo-box { width: 100%; min-height: 100px; border: 1px dashed #ddd; border-radius: 10px; padding: 10px; font-size: 0.9rem; background: #fffcf0; resize: none; outline: none; margin-top: 10px; }
-        .ai-feedback-container { background: #f0f7ff; border-radius: 15px; padding: 15px; margin-top: 15px; border-left: 5px solid #4a90e2; font-size: 0.85rem; line-height: 1.6; }
-        .feedback-btn { width: 100%; padding: 10px; background: #6c5ce7; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -66,29 +88,28 @@
     </div>
 
     <div class="main-content">
+        <!-- 지출 리스트 섹션 -->
         <section class="card">
-            <!-- 지출 항목 접기/펴기 기능 -->
             <div class="table-header">
                 <h3 style="margin:0; font-size: 1.1rem;">📋 지출 내역</h3>
-                <button class="action-btn" id="toggle-table-btn" onclick="toggleTable()">숨기기</button>
+                <button class="action-btn" id="toggle-list-btn" onclick="toggleList()">숨기기</button>
             </div>
-            <div class="table-wrapper" id="table-wrapper">
-                <table>
-                    <thead><tr><th>날짜</th><th>항목</th><th style="width:140px;">카테고리</th><th>금액</th><th></th></tr></thead>
-                    <tbody id="expense-list"></tbody>
-                </table>
+            <div class="list-wrapper" id="list-wrapper">
+                <div id="expense-list"></div>
             </div>
         </section>
+
+        <!-- 통계 및 메모 섹션 -->
         <div class="stats-side">
             <section class="card">
-                <div style="height: 250px;"><canvas id="expenseChart"></canvas></div>
+                <div style="height: 220px;"><canvas id="expenseChart"></canvas></div>
                 <div id="summary-list" style="margin-top: 15px;"></div>
                 <div id="total-display" class="total-amount">0원</div>
             </section>
 
             <section class="card">
                 <h3 style="margin:0; font-size: 1rem;">📝 월별 메모</h3>
-                <textarea id="month-memo" class="memo-box" placeholder="이달의 다짐이나 메모를 입력하세요..." oninput="handleMemoInput()"></textarea>
+                <textarea id="month-memo" class="memo-box" placeholder="이달의 다짐이나 목표를 기록하세요..." oninput="handleMemoInput()"></textarea>
             </section>
 
             <section class="card">
@@ -100,6 +121,7 @@
     </div>
 </div>
 
+<!-- 설정 모달 -->
 <div id="settings-modal" class="modal">
     <div class="modal-content">
         <h3>설정</h3>
@@ -121,6 +143,7 @@
 </div>
 
 <script>
+    // 1. Firebase 및 기본 설정
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -146,19 +169,7 @@
     let myChart = null;
     const modelName = "gemini-3-flash-preview";
 
-    // --- 기능 추가: 지출 내역 토글 ---
-    function toggleTable() {
-        const wrapper = document.getElementById('table-wrapper');
-        const btn = document.getElementById('toggle-table-btn');
-        if (wrapper.classList.contains('collapsed')) {
-            wrapper.classList.remove('collapsed');
-            btn.textContent = "숨기기";
-        } else {
-            wrapper.classList.add('collapsed');
-            btn.textContent = "보기";
-        }
-    }
-
+    // --- AI 통신 함수 ---
     async function callGemini(prompt) {
         if (!state.geminiKey) return null;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${state.geminiKey}`;
@@ -176,6 +187,14 @@
         }
     }
 
+    // --- UI 보조 기능 ---
+    function toggleList() {
+        const wrapper = document.getElementById('list-wrapper');
+        const btn = document.getElementById('toggle-list-btn');
+        wrapper.classList.toggle('collapsed');
+        btn.textContent = wrapper.classList.contains('collapsed') ? "보기" : "숨기기";
+    }
+
     function handleMemoInput() {
         const key = `${state.viewDate.getFullYear()}-${state.viewDate.getMonth() + 1}`;
         state.memos[key] = document.getElementById('month-memo').value;
@@ -187,17 +206,21 @@
         const month = state.viewDate.getMonth() + 1;
         const currentData = state.expenses.filter(ex => ex.year === year && ex.month === month);
         if (currentData.length === 0) { alert("지출 내역이 있어야 분석이 가능합니다."); return; }
+        
         const feedbackBox = document.getElementById('ai-feedback-text');
         const btn = document.getElementById('feedback-btn');
-        feedbackBox.innerText = "Gemini 3가 소비 패턴을 분석 중입니다...";
+        feedbackBox.innerText = "Gemini 3가 분석 중입니다...";
         btn.disabled = true;
+
         const dataSummary = currentData.map(d => `${d.item}(${d.category}): ${d.amount}원`).join(", ");
-        const prompt = `너는 전문 재무 설계사야. 나의 이번 달 지출 내역은 다음과 같아: [${dataSummary}]. 이 내역을 분석해서 1)칭찬할 점, 2)아쉬운 점, 3)다음 달을 위한 절약 팁을 친구에게 말하듯 친절하게 한국어로 요약해줘.`;
+        const prompt = `재무 전문가로서 다음 지출 내역을 분석해줘: [${dataSummary}]. 1)잘한 점, 2)아쉬운 점, 3)절약 팁을 친구에게 말하듯 친절하게 한국어로 요약해줘.`;
+        
         const result = await callGemini(prompt);
-        feedbackBox.innerText = result || "피드백을 생성할 수 없습니다. API 키를 확인하세요.";
+        feedbackBox.innerText = result || "피드백을 생성할 수 없습니다. 키를 확인하세요.";
         btn.disabled = false;
     }
 
+    // --- 데이터 추가 로직 ---
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -205,10 +228,12 @@
         const btn = document.getElementById('add-btn');
         btn.disabled = true;
         loader.style.display = 'block';
+
         const segments = inp.value.split(/[,|\n]/).map(s => s.trim()).filter(s => s.length > 0);
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
         let day = new Date().getDate();
+
         for (const seg of segments) {
             let text = seg;
             const dateMatch = text.match(/(\d{1,2})[월\/](\d{1,2})일?/);
@@ -222,8 +247,7 @@
                 const catPrompt = `"${text}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 설명 없이 단어만 답해.`;
                 const cleanedText = await callGemini(catPrompt);
                 const category = state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
-                const newEx = { id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category };
-                state.expenses.push(newEx);
+                state.expenses.push({ id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category });
             }
         }
         inp.value = '';
@@ -233,52 +257,78 @@
         render();
     }
 
-    function initSync() {
-        db.ref('/').on('value', (snapshot) => {
-            const val = snapshot.val();
-            if (val) {
-                state.expenses = val.expenses ? Object.values(val.expenses) : [];
-                state.categories = val.categories || state.categories;
-                state.memos = val.memos || {};
-                render();
-            }
-        });
-    }
-
-    function pushToCloud() {
-        db.ref('expenses').set(state.expenses);
-        db.ref('categories').set(state.categories);
-        db.ref('memos').set(state.memos);
-    }
-
+    // --- 렌더링 함수 (요청하신 날짜 그룹화 및 금액 색상 제거 적용) ---
     function render() {
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
         document.getElementById('current-month-display').textContent = `${year}년 ${month}월`;
+        
+        // 메모 로드
         const memoKey = `${year}-${month}`;
         document.getElementById('month-memo').value = state.memos[memoKey] || "";
-        let data = state.expenses.filter(ex => ex.year === year && ex.month === month);
+        document.getElementById('ai-feedback-text').innerText = "지출 내역을 기반으로 Gemini 3의 피드백을 받아보세요.";
+
+        const data = state.expenses.filter(ex => ex.year === year && ex.month === month);
         const listEl = document.getElementById('expense-list');
         listEl.innerHTML = '';
-        data.sort((a,b) => b.day - a.day).forEach(ex => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${ex.month}/${ex.day}</td>
-                <td>${ex.item}</td>
-                <td>
-                    <select class="category-select" onchange="updateExCat(${ex.id}, this.value)">
-                        ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
-                    </select>
-                </td>
-                <td>${ex.amount.toLocaleString()}원</td>
-                <td><button onclick="deleteEx(${ex.id})" style="border:none; background:none; color:#ccc; cursor:pointer;">✕</button></td>
+
+        // 날짜별 그룹화
+        const groups = data.reduce((acc, ex) => {
+            if (!acc[ex.day]) acc[ex.day] = { items: [], total: 0 };
+            acc[ex.day].items.push(ex);
+            acc[ex.day].total += ex.amount;
+            return acc;
+        }, {});
+
+        const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+        const sortedDays = Object.keys(groups).sort((a, b) => b - a);
+
+        sortedDays.forEach(day => {
+            const group = groups[day];
+            const dateObj = new Date(year, month - 1, day);
+            const dayIdx = dateObj.getDay();
+            
+            let dayColor = '#888'; // 평일
+            if (dayIdx === 0) dayColor = '#ff6b6b'; // 일요일
+            if (dayIdx === 6) dayColor = '#4a90e2'; // 토요일
+
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'date-group';
+            groupDiv.innerHTML = `
+                <div class="date-header">
+                    <div class="date-left">
+                        <span class="date-num">${day}</span>
+                        <span class="date-day-badge" style="background-color: ${dayColor}">${dayNames[dayIdx]}</span>
+                        <span class="date-ym">${year}.${String(month).padStart(2, '0')}</span>
+                    </div>
+                    <div class="date-total">${group.total.toLocaleString()}원</div>
+                </div>
+                <div class="group-items">
+                    ${group.items.map(ex => `
+                        <div class="expense-item">
+                            <div class="item-info">
+                                <div class="item-category-box">
+                                    <select class="category-select-mini" onchange="updateExCat(${ex.id}, this.value)">
+                                        ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <span class="item-name">${ex.item}</span>
+                            </div>
+                            <div class="item-right">
+                                <span class="item-amount">${ex.amount.toLocaleString()}원</span>
+                                <span class="item-delete" onclick="deleteEx(${ex.id})">✕</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
             `;
-            listEl.appendChild(tr);
+            listEl.appendChild(groupDiv);
         });
+
         updateStats(data);
     }
 
-    // --- 기능 추가: 퍼센티지 표시 로직 포함 ---
+    // --- 통계 업데이트 (퍼센티지 포함) ---
     function updateStats(data) {
         const stats = data.reduce((acc, curr) => { acc[curr.category] = (acc[curr.category] || 0) + curr.amount; return acc; }, {});
         const summaryEl = document.getElementById('summary-list');
@@ -287,14 +337,15 @@
         Object.values(stats).forEach(amt => total += amt);
 
         Object.entries(stats).sort((a,b) => b[1]-a[1]).forEach(([cat, amt]) => {
-            const percentage = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
+            const percent = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
             summaryEl.innerHTML += `
-                <div style="display:flex; justify-content:space-between; padding:5px; font-size:0.9rem; border-bottom: 1px solid #f0f0f0;">
-                    <span>${cat} <small style="color:#888;">(${percentage}%)</small></span>
+                <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:0.9rem; border-bottom:1px solid #f0f0f0;">
+                    <span>${cat} <small style="color:#aaa;">(${percent}%)</small></span>
                     <span style="font-weight:bold;">${amt.toLocaleString()}원</span>
                 </div>`;
         });
         document.getElementById('total-display').textContent = `${total.toLocaleString()}원`;
+        
         const ctx = document.getElementById('expenseChart').getContext('2d');
         if (myChart) myChart.destroy();
         if (Object.keys(stats).length > 0) {
@@ -302,6 +353,7 @@
         }
     }
 
+    // --- CSV 내보내기 (강화된 버전) ---
     function exportToCSV() {
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
@@ -309,6 +361,7 @@
         const stats = currentData.reduce((acc, curr) => { acc[curr.category] = (acc[curr.category] || 0) + curr.amount; return acc; }, {});
         const totalAmount = Object.values(stats).reduce((a, b) => a + b, 0);
         const statsArray = Object.entries(stats).sort((a,b) => b[1]-a[1]);
+        
         let csv = "\uFEFF날짜,항목,카테고리,금액,,[카테고리 요약],금액,비중(%)\n";
         const maxRows = Math.max(currentData.length, statsArray.length + 1);
         for (let i = 0; i < maxRows; i++) {
@@ -320,10 +373,9 @@
             row.push("");
             if (i < statsArray.length) {
                 const [cat, amt] = statsArray[i];
-                const percent = totalAmount > 0 ? ((amt / totalAmount) * 100).toFixed(1) : 0;
-                row.push(cat, amt, percent + "%");
+                row.push(cat, amt, ((amt / totalAmount) * 100).toFixed(1) + "%");
             } else if (i === statsArray.length && totalAmount > 0) {
-                row.push("총 지출 합계", totalAmount, "100%");
+                row.push("총 합계", totalAmount, "100%");
             }
             csv += row.join(",") + "\n";
         }
@@ -332,19 +384,37 @@
         link.download = `${year}년_${month}월_가계부.csv`; link.click();
     }
 
+    // --- 설정 및 데이터 동기화 ---
+    function initSync() {
+        db.ref('/').on('value', (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
+                state.expenses = val.expenses ? Object.values(val.expenses) : [];
+                state.categories = val.categories || state.categories;
+                state.memos = val.memos || {};
+                render();
+            }
+        });
+    }
+    function pushToCloud() {
+        db.ref('expenses').set(state.expenses);
+        db.ref('categories').set(state.categories);
+        db.ref('memos').set(state.memos);
+    }
+    function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); } }
+    function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); }
+    function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
         const list = document.getElementById('category-manager-list');
         list.innerHTML = state.categories.map(c => `<div style="display:flex; justify-content:space-between; padding:5px 0;"><span>${c}</span><button onclick="removeCategory('${c}')" style="color:#ff6b6b; border:none; background:none; cursor:pointer;">삭제</button></div>`).join('');
         document.getElementById('key-status-msg').innerHTML = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음";
     }
-    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("키 저장 완료!"); openSettings(); } }
-    function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); document.getElementById('new-cat-input').value = ""; } }
-    function removeCategory(c) { if(state.categories.length > 1 && confirm(`'${c}'를 삭제할까요?`)) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
-    function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); } }
-    function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); }
-    function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
     function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+    function saveApiKey() { const k = document.getElementById('gemini-key-input').value.trim(); if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("저장되었습니다."); openSettings(); } }
+    function addCategory() { const v = document.getElementById('new-cat-input').value.trim(); if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); document.getElementById('new-cat-input').value = ""; } }
+    function removeCategory(c) { if(state.categories.length > 1 && confirm(`'${c}'를 삭제하시겠습니까?`)) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); } }
+
     window.onload = initSync;
 </script>
 </body>
