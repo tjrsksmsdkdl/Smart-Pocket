@@ -35,6 +35,11 @@
         .total-amount { font-size: 1.6rem; font-weight: bold; color: var(--primary-color); text-align: right; margin-top: 20px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; }
+
+        /* 추가 스타일 */
+        .memo-box { width: 100%; min-height: 100px; border: 1px dashed #ddd; border-radius: 10px; padding: 10px; font-size: 0.9rem; background: #fffcf0; resize: none; outline: none; margin-top: 10px; }
+        .ai-feedback-container { background: #f0f7ff; border-radius: 15px; padding: 15px; margin-top: 15px; border-left: 5px solid #4a90e2; font-size: 0.85rem; line-height: 1.6; }
+        .feedback-btn { width: 100%; padding: 10px; background: #6c5ce7; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -74,10 +79,24 @@
                 <div id="summary-list"></div>
                 <div id="total-display" class="total-amount">0원</div>
             </section>
+
+            <!-- 기능 추가 1: 월별 메모 -->
+            <section class="card">
+                <h3 style="margin:0; font-size: 1rem;">📝 월별 메모</h3>
+                <textarea id="month-memo" class="memo-box" placeholder="이달의 다짐이나 메모를 입력하세요..." oninput="handleMemoInput()"></textarea>
+            </section>
+
+            <!-- 기능 추가 2: AI 피드백 -->
+            <section class="card">
+                <h3 style="margin:0; font-size: 1rem;">💡 AI 소비 분석</h3>
+                <div id="ai-feedback-text" class="ai-feedback-container">지출 내역을 기반으로 Gemini 3의 피드백을 받아보세요.</div>
+                <button id="feedback-btn" class="feedback-btn" onclick="getAIFeedback()">이달의 피드백 받기</button>
+            </section>
         </div>
     </div>
 </div>
 
+<!-- 설정 모달은 기존과 동일 -->
 <div id="settings-modal" class="modal">
     <div class="modal-content">
         <h3>설정</h3>
@@ -99,7 +118,6 @@
 </div>
 
 <script>
-    // 1. Firebase 설정
     const firebaseConfig = {
         apiKey: "AIzaSyC7bE0ICTArzvg7qJXHGNdhWPZZtyT6v1c",
         authDomain: "smart-pocket-ea308.firebaseapp.com",
@@ -118,51 +136,63 @@
         viewDate: new Date(),
         expenses: [],
         categories: ['식비', '교통비', '쇼핑/미용', '공과금', '취미', '생활용품', '구독/디지털'],
+        memos: {}, // 월별 메모 저장용
         geminiKey: localStorage.getItem('sp_gemini_key') || "" 
     };
 
     let myChart = null;
+    const modelName = "gemini-3-flash-preview"; // 사용자 요청에 따라 모델명 고정
 
-    // --- 2. AI 분류 로직 (Gemini 3 Flash Preview 전용) ---
-    async function askGeminiToCategorize(itemText) {
-        if (!state.geminiKey) return state.categories[0];
-
-        // 확인된 정답 모델명 적용
-        const modelName = "gemini-3-flash-preview"; 
+    // --- AI 공통 통신 함수 ---
+    async function callGemini(prompt) {
+        if (!state.geminiKey) return null;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${state.geminiKey}`;
-        
         try {
-            // 429 에러 방지를 위한 짧은 대기
-            await new Promise(r => setTimeout(r, 500));
-
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `"${itemText}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 설명 없이 단어만 답해.` }] }]
-                })
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
             });
-
-            if (!response.ok) {
-                const err = await response.json();
-                console.error("AI 서버 응답 에러:", err);
-                return state.categories[0];
-            }
-
             const data = await response.json();
-            const aiText = data.candidates[0].content.parts[0].text.trim();
-            const cleanedText = aiText.replace(/[^\wㄱ-ㅎㅏ-ㅣ가-힣]/g, ""); 
-            
-            console.log(`Gemini 3 분석: ${itemText} -> ${cleanedText}`);
-            return state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
-
+            return data.candidates[0].content.parts[0].text.trim();
         } catch (e) {
             console.error("AI 통신 실패:", e);
-            return state.categories[0];
+            return null;
         }
     }
 
-    // --- 3. 데이터 입력 처리 ---
+    // --- 기능 1 & 2: 메모 및 AI 피드백 로직 ---
+    function handleMemoInput() {
+        const key = `${state.viewDate.getFullYear()}-${state.viewDate.getMonth() + 1}`;
+        state.memos[key] = document.getElementById('month-memo').value;
+        db.ref('memos').set(state.memos);
+    }
+
+    async function getAIFeedback() {
+        const year = state.viewDate.getFullYear();
+        const month = state.viewDate.getMonth() + 1;
+        const currentData = state.expenses.filter(ex => ex.year === year && ex.month === month);
+        
+        if (currentData.length === 0) {
+            alert("지출 내역이 있어야 분석이 가능합니다.");
+            return;
+        }
+
+        const feedbackBox = document.getElementById('ai-feedback-text');
+        const btn = document.getElementById('feedback-btn');
+        feedbackBox.innerText = "Gemini 3가 소비 패턴을 분석 중입니다...";
+        btn.disabled = true;
+
+        const dataSummary = currentData.map(d => `${d.item}(${d.category}): ${d.amount}원`).join(", ");
+        const prompt = `너는 전문 재무 설계사야. 나의 이번 달 지출 내역은 다음과 같아: [${dataSummary}]. 
+        이 내역을 분석해서 1)칭찬할 점, 2)아쉬운 점, 3)다음 달을 위한 절약 팁을 친구에게 말하듯 친절하게 한국어로 요약해줘.`;
+
+        const result = await callGemini(prompt);
+        feedbackBox.innerText = result || "피드백을 생성할 수 없습니다. API 키를 확인하세요.";
+        btn.disabled = false;
+    }
+
+    // --- 기존 기능 유지 및 개선 ---
     async function handleAdd() {
         const inp = document.getElementById('natural-input');
         if (!inp.value.trim()) return;
@@ -189,7 +219,10 @@
                 if (last.includes("만원")) amt *= 10000;
                 text = text.replace(last, "").trim() || "기타";
                 
-                const category = await askGeminiToCategorize(text);
+                const catPrompt = `"${text}"를 [${state.categories.join(", ")}] 중 하나로 분류해. 설명 없이 단어만 답해.`;
+                const cleanedText = await callGemini(catPrompt);
+                const category = state.categories.includes(cleanedText) ? cleanedText : state.categories[0];
+
                 const newEx = { id: Date.now() + Math.random(), year, month, day, item: text, amount: amt, category };
                 state.expenses.push(newEx);
             }
@@ -202,13 +235,13 @@
         render();
     }
 
-    // --- 4. Firebase 동기화 및 렌더링 ---
     function initSync() {
         db.ref('/').on('value', (snapshot) => {
             const val = snapshot.val();
             if (val) {
                 state.expenses = val.expenses ? Object.values(val.expenses) : [];
                 state.categories = val.categories || state.categories;
+                state.memos = val.memos || {};
                 render();
             }
         });
@@ -217,12 +250,19 @@
     function pushToCloud() {
         db.ref('expenses').set(state.expenses);
         db.ref('categories').set(state.categories);
+        db.ref('memos').set(state.memos);
     }
 
     function render() {
         const year = state.viewDate.getFullYear();
         const month = state.viewDate.getMonth() + 1;
         document.getElementById('current-month-display').textContent = `${year}년 ${month}월`;
+        
+        // 메모 불러오기
+        const memoKey = `${year}-${month}`;
+        document.getElementById('month-memo').value = state.memos[memoKey] || "";
+        document.getElementById('ai-feedback-text').innerText = "지출 내역을 기반으로 Gemini 3의 피드백을 받아보세요.";
+
         let data = state.expenses.filter(ex => ex.year === year && ex.month === month);
         const listEl = document.getElementById('expense-list');
         listEl.innerHTML = '';
@@ -261,7 +301,51 @@
         }
     }
 
-    // --- 5. 설정 및 기타 ---
+    // --- 기능 3: 강화된 CSV 추출 (F열 이후 통계 포함) ---
+    function exportToCSV() {
+        const year = state.viewDate.getFullYear();
+        const month = state.viewDate.getMonth() + 1;
+        const currentData = state.expenses.filter(ex => ex.year === year && ex.month === month);
+        
+        // 카테고리별 통계 계산
+        const stats = currentData.reduce((acc, curr) => { acc[curr.category] = (acc[curr.category] || 0) + curr.amount; return acc; }, {});
+        const totalAmount = Object.values(stats).reduce((a, b) => a + b, 0);
+        const statsArray = Object.entries(stats).sort((a,b) => b[1]-a[1]);
+
+        let csv = "\uFEFF날짜,항목,카테고리,금액,,[카테고리 요약],금액,비중(%)\n";
+        
+        const maxRows = Math.max(currentData.length, statsArray.length + 1);
+        
+        for (let i = 0; i < maxRows; i++) {
+            let row = [];
+            // A-D열: 개별 내역
+            if (i < currentData.length) {
+                const ex = currentData[i];
+                row.push(`${ex.year}-${ex.month}-${ex.day}`, `"${ex.item.replace(/"/g, '""')}"`, ex.category, ex.amount);
+            } else {
+                row.push("", "", "", "");
+            }
+            
+            row.push(""); // E열: 구분
+
+            // F-H열: 통계 정보
+            if (i < statsArray.length) {
+                const [cat, amt] = statsArray[i];
+                const percent = totalAmount > 0 ? ((amt / totalAmount) * 100).toFixed(1) : 0;
+                row.push(cat, amt, percent + "%");
+            } else if (i === statsArray.length && totalAmount > 0) {
+                row.push("총 지출 합계", totalAmount, "100%");
+            }
+
+            csv += row.join(",") + "\n";
+        }
+
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.download = `${year}년_${month}월_가계부.csv`; link.click();
+    }
+
+    // --- 설정 및 관리 함수 (기존과 동일) ---
     function openSettings() {
         document.getElementById('settings-modal').style.display = 'flex';
         const list = document.getElementById('category-manager-list');
@@ -273,43 +357,21 @@
         `).join('');
         document.getElementById('key-status-msg').innerHTML = state.geminiKey ? "✅ 키 저장됨" : "❌ 키 없음";
     }
-
     function saveApiKey() {
         const k = document.getElementById('gemini-key-input').value.trim();
-        if(k) {
-            state.geminiKey = k;
-            localStorage.setItem('sp_gemini_key', k);
-            alert("Gemini 3 키 저장 완료!");
-            openSettings();
-        }
+        if(k) { state.geminiKey = k; localStorage.setItem('sp_gemini_key', k); alert("키 저장 완료!"); openSettings(); }
     }
-
     function addCategory() {
         const v = document.getElementById('new-cat-input').value.trim();
-        if(v && !state.categories.includes(v)) {
-            state.categories.push(v); pushToCloud(); openSettings();
-            document.getElementById('new-cat-input').value = "";
-        }
+        if(v && !state.categories.includes(v)) { state.categories.push(v); pushToCloud(); openSettings(); document.getElementById('new-cat-input').value = ""; }
     }
-
     function removeCategory(c) {
-        if(state.categories.length > 1 && confirm(`'${c}'를 삭제할까요?`)) {
-            state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings();
-        }
+        if(state.categories.length > 1 && confirm(`'${c}'를 삭제할까요?`)) { state.categories = state.categories.filter(x => x !== c); pushToCloud(); openSettings(); }
     }
-
     function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); } }
     function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); }
     function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
     function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-    function exportToCSV() {
-        const d = state.expenses.filter(ex => ex.year === state.viewDate.getFullYear() && ex.month === (state.viewDate.getMonth()+1));
-        let csv = "\uFEFF날짜,항목,카테고리,금액\n";
-        d.forEach(ex => csv += `${ex.year}-${ex.month}-${ex.day},${ex.item},${ex.category},${ex.amount}\n`);
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = `가계부_데이터.csv`; link.click();
-    }
 
     window.onload = initSync;
 </script>
