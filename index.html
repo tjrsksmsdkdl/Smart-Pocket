@@ -109,6 +109,10 @@
             font-weight: 500;
             color: #333;
         }
+        .item-name,
+.item-amount {
+    cursor: pointer;   /* 클릭해서 수정 가능한 느낌 */
+}
 
         /* X 아이콘: 작게 + 여백 축소 */
         .item-delete {
@@ -410,10 +414,10 @@
                                         ${state.categories.map(c => `<option value="${c}" ${ex.category === c ? 'selected' : ''}>${c}</option>`).join('')}
                                     </select>
                                 </div>
-                                <span class="item-name">${ex.item}</span>
+                                <span class="item-name" onclick="editItemName(${ex.id})">${ex.item}</span>
                             </div>
                             <div class="item-right">
-                                <span class="item-amount">${ex.amount.toLocaleString()}원</span>
+                                <span class="item-amount" onclick="editItemAmount(${ex.id})">${ex.amount.toLocaleString()}원</span>
                                 <span class="item-delete" onclick="deleteEx(${ex.id})">✕</span>
                             </div>
                         </div>
@@ -510,6 +514,41 @@
     function changeMonth(d) { state.viewDate.setMonth(state.viewDate.getMonth() + d); render(); }
     function deleteEx(id) { if(confirm('삭제하시겠습니까?')) { state.expenses = state.expenses.filter(e => e.id !== id); pushToCloud(); render(); } }
     function updateExCat(id, cat) { state.expenses = state.expenses.map(e => e.id === id ? {...e, category: cat} : e); pushToCloud(); render(); }
+    function editItemName(id) {
+    const ex = state.expenses.find(e => e.id === id);
+    if (!ex) return;
+
+    const newName = prompt("새 항목 이름을 입력하세요.", ex.item);
+    if (newName === null) return;          // 취소
+    const trimmed = newName.trim();
+    if (!trimmed) return;                  // 빈 문자열은 무시
+
+    state.expenses = state.expenses.map(e =>
+        e.id === id ? { ...e, item: trimmed } : e
+    );
+    pushToCloud();
+    render();
+}
+
+function editItemAmount(id) {
+    const ex = state.expenses.find(e => e.id === id);
+    if (!ex) return;
+
+    const newVal = prompt("새 금액을 숫자로 입력하세요.", ex.amount);
+    if (newVal === null) return;           // 취소
+
+    const parsed = parseInt(String(newVal).replace(/[^\d]/g, ''), 10);
+    if (isNaN(parsed) || parsed < 0) {
+        alert("올바른 숫자를 입력해주세요.");
+        return;
+    }
+
+    state.expenses = state.expenses.map(e =>
+        e.id === id ? { ...e, amount: parsed } : e
+    );
+    pushToCloud();
+    render();
+}
 
     // 메모 입력 시: 로컬 상태만 수정
     function handleMemoInput() { 
@@ -615,5 +654,6 @@
 </script>
 </body>
 </html>
+
 
 
